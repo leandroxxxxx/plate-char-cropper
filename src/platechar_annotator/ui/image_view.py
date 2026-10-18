@@ -7,28 +7,25 @@ view's transform scales it to fit the available area.
 from collections.abc import Sequence
 
 from PIL import Image
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
     QImage,
     QPainter,
-    QPen,
     QPixmap,
     QResizeEvent,
 )
 from PySide6.QtWidgets import (
     QFrame,
-    QGraphicsItem,
     QGraphicsPixmapItem,
-    QGraphicsRectItem,
     QGraphicsScene,
-    QGraphicsSimpleTextItem,
     QGraphicsView,
     QWidget,
 )
 
 from platechar_annotator.models.selection import CharacterRect
+from platechar_annotator.ui.rect_item import RectOverlayItem
 
 # Distinct overlay colors for rectangles 1..7 (left to right).
 _RECT_COLOR_HEX = [
@@ -56,12 +53,16 @@ def pil_to_qpixmap(image: Image.Image) -> QPixmap:
 class ImageView(QGraphicsView):
     """Displays an image scaled to fit the widget, keeping its aspect ratio."""
 
+    # Emitted while a rectangle is moved or resized, with its new geometry:
+    # (index, x, y, width, height) in original-image pixel coordinates.
+    rectangle_changed = Signal(int, float, float, float, float)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
         self._pixmap_item: QGraphicsPixmapItem | None = None
-        self._rect_items: list[QGraphicsRectItem] = []
+        self._rect_items: list[RectOverlayItem] = []
 
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.setBackgroundBrush(QBrush(QColor(40, 40, 40)))
@@ -91,33 +92,25 @@ class ImageView(QGraphicsView):
             self._scene.removeItem(item)
         self._rect_items = [self._add_rect_overlay(rect) for rect in rectangles]
 
-    def _add_rect_overlay(self, rect: CharacterRect) -> QGraphicsRectItem:
-        """Add the overlay (outline, tint, index label) for one rectangle."""
+    def _add_rect_overlay(self, rect: CharacterRect) -> RectOverlayItem:
+        """Add the interactive overlay for one rectangle."""
         color = QColor(_RECT_COLOR_HEX[(rect.index - 1) % len(_RECT_COLOR_HEX)])
 
-        pen = QPen(color)
-        pen.setWidth(2)
-        pen.setCosmetic(True)  # Constant on-screen width at any zoom.
-
-        tint = QColor(color)
-        tint.setAlpha(40)
-
-        item = QGraphicsRectItem(QRectF(rect.x, rect.y, rect.width, rect.height))
-        item.setPen(pen)
-        item.setBrush(QBrush(tint))
-        item.setZValue(1)
-
-        label = QGraphicsSimpleTextItem(str(rect.index), item)
-        label.setBrush(QBrush(color))
-        font = label.font()
-        font.setBold(True)
-        label.setFont(font)
-        # Keep the label a constant, readable size regardless of zoom.
-        label.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
-        label.setPos(rect.x, rect.y)
+        item = RectOverlayItem(
+            rect.index,
+            QRectF(rect.x, rect.y, rect.width, rect.height),
+            color,
+            self._on_overlay_changed,
+        )
 
         self._scene.addItem(item)
         return item
+
+    def _on_overlay_changed(self, index: int, rect: QRectF) -> None:
+        """Forward an overlay's new geometry to listeners."""
+        self.rectangle_changed.emit(
+            index, rect.x(), rect.y(), rect.width(), rect.height()
+        )
 
     def fit_to_view(self) -> None:
         """Scale the view so the whole image is visible."""

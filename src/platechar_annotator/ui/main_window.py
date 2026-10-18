@@ -58,6 +58,7 @@ class MainWindow(QMainWindow):
         self._folder_label = QLabel("No destination folder selected.")
 
         self._image_view = ImageView()
+        self._image_view.rectangle_changed.connect(self._on_rectangle_changed)
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._open_button)
@@ -128,3 +129,12 @@ class MainWindow(QMainWindow):
         self._destination_folder = folder
         self._folder_label.setText(str(folder))
         self._folder_label.setToolTip(str(folder))
+
+    def _on_rectangle_changed(
+        self, index: int, x: float, y: float, width: float, height: float
+    ) -> None:
+        """Keep the stored rectangle in sync with its overlay."""
+        for rect in self._rectangles:
+            if rect.index == index:
+                rect.x, rect.y, rect.width, rect.height = x, y, width, height
+                return

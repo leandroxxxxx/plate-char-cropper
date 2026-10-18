@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 3 (rectangle overlays).
+**Current status:** Stage 4 (rectangle manipulation).
 
 ## Install
 
@@ -36,12 +36,21 @@ Desktop tool for manually extracting individual characters from license plate im
 1. Open an image. Seven rectangles, numbered 1 to 7 from left to right, should appear over it, each in a different color.
 2. Resize the window. The rectangles must stay aligned with the same parts of the image, and their outlines must keep a constant thickness.
 3. Open an image with different dimensions. The rectangles should be recalculated for the new image.
-4. Confirm the rectangles cannot be moved or resized yet (that is Stage 4).
+
+## How to test Stage 4
+
+1. Click rectangle 3. It should get a thicker outline, a stronger tint, and eight small handles.
+2. Drag its body. It should move with the cursor; its number must stay 3 and the other rectangles must not move.
+3. Drag an edge or a corner. It should resize, and the cursor should change shape near edges and corners.
+4. Drag or resize past the image border. The rectangle must stop at the border, and it must stop shrinking at a very small size.
+5. Resize the window, then drag again. The rectangle must still follow the cursor exactly.
+6. Click an empty area of the image. The selection should clear.
 
 ## Limitations and notes
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
 - Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
 - Rectangle geometry is stored in original-image pixels and is reset to the default layout every time an image is opened. Whether positions should carry over between images is left for a later stage.
+- Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
 - No automated tests yet. Tests for the non-GUI modules are planned from Stage 5 onward.
 - Cropping and saving are intentionally not implemented yet. The plate field is not validated until saving exists (Stage 6).
