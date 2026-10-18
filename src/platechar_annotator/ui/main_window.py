@@ -13,6 +13,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from platechar_annotator.models.selection import (
+    CharacterRect,
+    create_default_rectangles,
+)
 from platechar_annotator.services.image_service import (
     ImageLoadError,
     LoadedImage,
@@ -33,6 +37,7 @@ class MainWindow(QMainWindow):
         self._current_image: LoadedImage | None = None
         self._last_directory: Path | None = None
         self._destination_folder: Path | None = None
+        self._rectangles: list[CharacterRect] = []
 
         self._open_button = QPushButton("Open image…")
         self._open_button.clicked.connect(self._on_open_image)
@@ -82,6 +87,11 @@ class MainWindow(QMainWindow):
         return self._current_image
 
     @property
+    def rectangles(self) -> list[CharacterRect]:
+        """Character rectangles in original-image pixel coordinates."""
+        return self._rectangles
+
+    @property
     def plate_text(self) -> str:
         """Raw plate field text; not stripped, since blank positions matter."""
         return self._plate_input.text()
@@ -105,7 +115,9 @@ class MainWindow(QMainWindow):
 
         self._current_image = loaded
         self._last_directory = path.parent
+        self._rectangles = create_default_rectangles(loaded.width, loaded.height)
         self._image_view.set_image(loaded.pixels)
+        self._image_view.set_rectangles(self._rectangles)
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
 
     def _on_select_folder(self) -> None:
