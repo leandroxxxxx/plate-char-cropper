@@ -1,48 +1,39 @@
 # PlateChar Annotator
 
-A Python application for manually annotating and extracting individual license plate characters from images captured from videos.
+Desktop tool for manually extracting individual characters from license plate images.
 
-## Objective
+**Current status:** Stage 1 (project skeleton and image loading).
 
-Simplify the creation of character-level datasets for training and evaluating artificial intelligence models, particularly for license plate recognition in surveillance camera footage.
+## Install
 
-## Planned Features
-
-- Load images for annotation.
-- Enter the license plate sequence before starting annotation.
-- Display seven adjustable rectangles to select individual characters.
-- Associate each rectangle with the corresponding character in the plate.
-- Maintain the correct left-to-right character order.
-- Automatically save individual character crops.
-- Preserve the original image filename in the generated filenames.
-- Append the corresponding character label to each output filename.
-- Organize the extracted images for subsequent processing and AI model training.
-
-## Filename Convention
-
-For a license plate `ABC1D23` and a source image named `0001_video_00-01-23.450.png`, the extracted characters may be saved as follows:
-
-```text
-0001_video_00-01-23.450_A.png
-0001_video_00-01-23.450_B.png
-0001_video_00-01-23.450_C.png
-0001_video_00-01-23.450_1.png
-0001_video_00-01-23.450_D.png
-0001_video_00-01-23.450_2.png
-0001_video_00-01-23.450_3.png
+```bash
+python -m venv .venv
+# Linux/macOS: source .venv/bin/activate
+# Windows:     .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-This naming convention links each cropped image to its corresponding character while preserving information about the source image.
+## Run
 
-## Technologies
+```bash
+python main.py
+```
+````
 
-- Python
-- Image processing and graphical interface libraries (to be determined).
+## How to test Stage 1
 
-## Project Status
+1. Run `python main.py`. The window should open.
+2. Click **Open image…** and pick a PNG, JPEG, or WebP file. The image should appear scaled to fit, and the label should show its path and original size.
+3. Resize the window. The image should rescale and keep its aspect ratio.
+4. Open a second image. It should replace the first without restarting.
+5. Open a non-image file (choose "All files" in the dialog). An error message should appear and the previous image should remain.
 
-Early development stage.
+## Limitations and notes
 
-## License
+- I have not executed or tested this code; please run the checklist above.
+- EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
+- Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
+- No automated tests yet. Tests for the non-GUI modules are planned from Stage 5 onward.
+- Rectangles, character input, destination folder, cropping, and saving are intentionally not implemented.
 
-To be determined.
+Stopping here as instructed. Ready for the Stage 2 request.
