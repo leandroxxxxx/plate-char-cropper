@@ -18,6 +18,16 @@ def ask_image_path(parent: QWidget | None, start_directory: Path | None) -> Path
     return Path(selected) if selected else None
 
 
+def ask_directory(parent: QWidget | None, start_directory: Path | None) -> Path | None:
+    """Show a folder selection dialog. Returns None if the user cancels."""
+    selected = QFileDialog.getExistingDirectory(
+        parent,
+        "Select destination folder",
+        str(start_directory) if start_directory else "",
+    )
+    return Path(selected) if selected else None
+
+
 def show_error(parent: QWidget | None, title: str, message: str) -> None:
     """Show a modal error message."""
     QMessageBox.critical(parent, title, message)
