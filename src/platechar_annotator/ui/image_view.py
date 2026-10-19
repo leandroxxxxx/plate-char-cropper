@@ -9,11 +9,12 @@ stored in original-image pixels regardless of the on-screen zoom.
 from collections.abc import Sequence
 
 from PIL import Image
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QPoint, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
     QImage,
+    QMouseEvent,
     QPainter,
     QPixmap,
     QResizeEvent,
@@ -71,6 +72,7 @@ class ImageView(QGraphicsView):
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._rect_items: list[RectOverlayItem] = []
         self._manual_zoom = False  # True once the user zooms, until fit/reset.
+        self._pan_last_pos: QPoint | None = None  # Set while middle-dragging.
 
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.setBackgroundBrush(QBrush(QColor(40, 40, 40)))
@@ -143,11 +145,64 @@ class ImageView(QGraphicsView):
         target = max(_ZOOM_MIN, min(current * factor, _ZOOM_MAX))
         self.scale(target / current, target / current)
 
+    def visible_image_rect(self) -> tuple[float, float, float, float] | None:
+        """The part of the image currently visible, in original-image pixels.
+
+        Returns ``(x, y, width, height)`` clipped to the image bounds, or None
+        if no image is loaded or nothing of it is visible.
+        """
+        if self._pixmap_item is None:
+            return None
+        visible = self.mapToScene(self.viewport().rect()).boundingRect()
+        visible = visible.intersected(self._scene.sceneRect())
+        if visible.width() <= 0 or visible.height() <= 0:
+            return None
+        return (visible.x(), visible.y(), visible.width(), visible.height())
+
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 (Qt API)
-        """Scroll wheel zooms in (up) and out (down)."""
+        """Scroll wheel zooms in (up) and out (down), around the cursor."""
         factor = _ZOOM_STEP if event.angleDelta().y() > 0 else 1 / _ZOOM_STEP
+        # Keep the image point under the cursor fixed, so the user can zoom
+        # straight into the part of interest.
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.zoom_by(factor)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         event.accept()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt API)
+        """Middle button starts panning; other buttons behave as usual."""
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._pan_last_pos = event.position().toPoint()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt API)
+        if self._pan_last_pos is not None:
+            pos = event.position().toPoint()
+            delta = pos - self._pan_last_pos
+            self._pan_last_pos = pos
+            self.horizontalScrollBar().setValue(
+                self.horizontalScrollBar().value() - delta.x()
+            )
+            self.verticalScrollBar().setValue(
+                self.verticalScrollBar().value() - delta.y()
+            )
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt API)
+        if (
+            event.button() == Qt.MouseButton.MiddleButton
+            and self._pan_last_pos is not None
+        ):
+            self._pan_last_pos = None
+            self.unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 (Qt API)
         super().resizeEvent(event)

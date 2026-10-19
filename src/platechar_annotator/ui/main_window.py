@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from platechar_annotator.models.selection import (
     CharacterRect,
-    create_default_rectangles,
+    create_rectangles_in_region,
 )
 from platechar_annotator.services.crop_service import CropError
 from platechar_annotator.services.image_service import (
@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
 
         self._place_button = QPushButton("Place rectangles")
         self._place_button.setToolTip(
-            "Show the seven character rectangles over the image"
+            "Place the seven character rectangles inside the currently visible area"
         )
         self._place_button.clicked.connect(self._on_place_rectangles)
 
@@ -160,7 +160,13 @@ class MainWindow(QMainWindow):
         self._status_label.setText("")
 
     def _on_place_rectangles(self) -> None:
-        """Show the rectangles on demand, or hide them if already visible."""
+        """Place the seven rectangles inside the currently visible area.
+
+        The zoom level is left untouched, so zooming into the part of
+        interest and then clicking the button yields seven complete
+        rectangles fitted into that zoomed view, ready to be rearranged.
+        Clicking the button again re-places them in the current view.
+        """
         image = self._current_image
         if image is None:
             dialogs.show_error(
@@ -168,18 +174,16 @@ class MainWindow(QMainWindow):
             )
             return
 
-        if self._rectangles_visible:
-            # Hide the overlays but keep the geometry for re-showing.
-            self._image_view.set_rectangles([])
-            self._rectangles_visible = False
-            self._place_button.setText("Place rectangles")
-            return
-
-        if not self._rectangles:
-            self._rectangles = create_default_rectangles(image.width, image.height)
+        region = self._image_view.visible_image_rect()
+        if region is None:
+            # Nothing of the image is on screen (should not normally happen);
+            # fall back to the whole image.
+            region = (0.0, 0.0, float(image.width), float(image.height))
+        x, y, width, height = region
+        self._rectangles = create_rectangles_in_region(x, y, width, height)
         self._image_view.set_rectangles(self._rectangles)
         self._rectangles_visible = True
-        self._place_button.setText("Hide rectangles")
+        self._place_button.setText("Re-place rectangles")
 
     def _on_select_folder(self) -> None:
         folder = dialogs.ask_directory(self, self._destination_folder)

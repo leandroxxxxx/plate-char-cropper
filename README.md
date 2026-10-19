@@ -54,13 +54,13 @@ Desktop tool for manually extracting individual characters from license plate im
 ## How to test zoom and on-demand rectangles
 
 1. Open an image. No rectangles should appear, and the image should fit the window.
-2. Click **Zoom +** and **Zoom −** (or use the mouse wheel). The image should zoom around the viewport center and keep its aspect ratio.
-3. Click **Fit**. The image should return to fitting the window.
-4. Resize the window after zooming. The zoom level must be kept until **Fit** is used or another image is opened.
-5. Click **Place rectangles**. Seven rectangles should appear over the image.
-6. Click the same button (**Hide rectangles**). The rectangles should disappear but keep their positions.
-7. Click it again. The rectangles should reappear in the same positions.
-8. Open another image. The rectangles must disappear and be reset, and **Place rectangles** must create a fresh default layout for the new image.
+2. Scroll the mouse wheel over the plate area (or click **Zoom +**). The image should zoom toward the cursor, keeping its aspect ratio.
+3. Middle-drag (or use the scrollbars if visible) to pan to the part of interest.
+4. Click **Place rectangles**. All seven rectangles should appear **complete inside the currently visible area**, ready to be dragged onto the characters. The zoom level must not change.
+5. Zoom or pan elsewhere and click **Re-place rectangles**. The seven rectangles should be laid out again inside the new visible area.
+6. Click **Fit**. The image should return to fitting the window.
+7. Resize the window after zooming. The zoom level must be kept until **Fit** is used or another image is opened.
+8. Open another image. The rectangles must disappear and be reset, and **Place rectangles** must create a fresh layout for the new image.
 
 ## How to test Stage 6
 
@@ -76,7 +76,8 @@ Desktop tool for manually extracting individual characters from license plate im
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
 - Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
-- Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked; hiding them afterwards keeps their positions for the current image. Whether positions should carry over between images is left for a later stage.
+- Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked, which lays all seven out inside the currently visible (possibly zoomed) area; clicking it again re-places them in the new view, discarding manual adjustments. Whether positions should carry over between images is left for a later stage.
+- Wheel zoom centers on the cursor and middle-drag pans, so the part of interest can be brought into view before placing the rectangles.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
 - Zoom is display-only: it never changes the stored rectangle coordinates or the saved crops.
 - Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop itself is never resized or filtered.
