@@ -23,6 +23,11 @@ from platechar_annotator.services.image_service import (
     LoadedImage,
     load_image,
 )
+from platechar_annotator.services.save_service import (
+    SaveError,
+    prepare_save,
+    save_crops,
+)
 from platechar_annotator.ui import dialogs
 from platechar_annotator.ui.crop_preview import CropPreview
 from platechar_annotator.ui.image_view import ImageView
@@ -45,7 +50,11 @@ class MainWindow(QMainWindow):
         self._open_button = QPushButton("Open image…")
         self._open_button.clicked.connect(self._on_open_image)
 
+        self._save_button = QPushButton("Save characters…")
+        self._save_button.clicked.connect(self._on_save)
+
         self._path_label = QLabel("No image loaded.")
+        self._status_label = QLabel("")
 
         self._plate_input = QLineEdit()
         self._plate_input.setPlaceholderText(
@@ -68,6 +77,7 @@ class MainWindow(QMainWindow):
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._open_button)
+        toolbar.addWidget(self._save_button)
         toolbar.addWidget(self._path_label, stretch=1)
 
         plate_row = QHBoxLayout()
@@ -78,6 +88,9 @@ class MainWindow(QMainWindow):
         folder_row.addWidget(self._folder_button)
         folder_row.addWidget(self._folder_label, stretch=1)
 
+        status_row = QHBoxLayout()
+        status_row.addWidget(self._status_label, stretch=1)
+
         body = QHBoxLayout()
         body.addWidget(self._image_view, stretch=1)
         body.addWidget(self._crop_preview)
@@ -86,6 +99,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(toolbar)
         layout.addLayout(plate_row)
         layout.addLayout(folder_row)
+        layout.addLayout(status_row)
         layout.addLayout(body, stretch=1)
 
         central = QWidget()
@@ -172,3 +186,45 @@ class MainWindow(QMainWindow):
             self._crop_preview.show_message(str(exc))
             return
         self._crop_preview.show_crop(rect.index, crop)
+
+    def _on_save(self) -> None:
+        """Validate everything, then save the non-empty character crops."""
+        if self._current_image is None:
+            dialogs.show_error(self, "Cannot save", "Open an image first.")
+            return
+
+        try:
+            planned = prepare_save(
+                self._current_image,
+                self.plate_text,
+                self._rectangles,
+                self._destination_folder,
+            )
+        except SaveError as exc:
+            dialogs.show_error(self, "Cannot save", str(exc))
+            return
+        except CropError as exc:
+            dialogs.show_error(self, "Invalid crop region", str(exc))
+            return
+
+        existing = [crop for crop in planned if crop.exists]
+        overwrite = False
+        if existing:
+            names = [crop.destination.name for crop in existing]
+            answer = dialogs.ask_overwrite(self, names)
+            if answer is None:
+                return  # User cancelled.
+            overwrite = answer
+
+        try:
+            saved = save_crops(planned, overwrite)
+        except OSError as exc:
+            dialogs.show_error(self, "Save failed", f"Could not write the files: {exc}")
+            return
+
+        if saved:
+            self._status_label.setText(
+                f"Saved {len(saved)} crop(s) to {self._destination_folder}"
+            )
+        else:
+            self._status_label.setText("Nothing was saved: all files already exist.")

@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 5 (crop extraction and preview).
+**Current status:** Stage 6 (filename generation and individual saving).
 
 ## Install
 
@@ -59,6 +59,16 @@ Desktop tool for manually extracting individual characters from license plate im
 4. Click an empty area of the image. The preview should clear.
 5. Open another image. The preview should clear.
 
+## How to test Stage 6
+
+1. Open an image, enter `ABC1D23` in the **Plate** field, and select a destination folder.
+2. Click **Save characters…**. The status bar should report that 7 crops were saved, and the folder should contain `0001_video_00-01-23.450_A.png` … `0001_video_00-01-23.450_3.png`, each with the same pixel dimensions as its rectangle.
+3. Save again. A dialog should warn that the files already exist, offering **Overwrite All**, **Skip All**, and **Cancel**. Try each option.
+4. Clear the plate field and save. An error must appear and no files may change.
+5. Enter `AB 1D23` and save to a fresh folder. Only 6 files should appear, for positions 1, 2, 4, 5, 6, 7 (`A`, `B`, `1`, `D`, `2`, `3`). The blank position must not shift the others.
+6. Enter a plate containing a filename-invalid character (e.g. `A/B1D23`) and save. The output filename must use an underscore in place of the invalid character.
+7. Try saving without selecting a destination folder. An error must appear.
+
 ## Limitations and notes
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
@@ -66,5 +76,7 @@ Desktop tool for manually extracting individual characters from license plate im
 - Rectangle geometry is stored in original-image pixels and is reset to the default layout every time an image is opened. Whether positions should carry over between images is left for a later stage.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
 - Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop preview is enlarged or reduced for display only; the crop itself is never resized or filtered.
-- Automated tests cover the non-GUI logic only (`crop_service`); GUI behavior is checked manually with the steps above.
-- Saving is intentionally not implemented yet. The plate field is not validated until saving exists (Stage 6).
+- Output files are always PNG, named `{source_stem}_{character}.png`. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels.
+- Existing files are never overwritten silently: saving stops and asks to overwrite all, skip all, or cancel. There is no per-file choice, and skipping some positions is done via spaces in the plate field.
+- The plate field is not cleared after a successful save. Clearing it after saving is deferred to the workflow-refinement stage.
+- Automated tests cover the non-GUI logic only (`crop_service`, `filename_service`, `save_service`); GUI behavior is checked manually with the steps above.
