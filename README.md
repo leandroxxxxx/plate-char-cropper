@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 4 (rectangle manipulation).
+**Current status:** Stage 5 (crop extraction and preview).
 
 ## Install
 
@@ -14,6 +14,11 @@ Desktop tool for manually extracting individual characters from license plate im
 ## Run
 
     python main.py
+
+## Run the tests
+
+    pip install -r requirements-dev.txt
+    python -m pytest
 
 ## How to test Stage 1
 
@@ -46,11 +51,20 @@ Desktop tool for manually extracting individual characters from license plate im
 5. Resize the window, then drag again. The rectangle must still follow the cursor exactly.
 6. Click an empty area of the image. The selection should clear.
 
+## How to test Stage 5
+
+1. Click rectangle 3. The **Crop preview** panel on the right should show only the pixels inside that rectangle, with a caption giving its size in original pixels.
+2. Drag and resize the rectangle. The preview must update while you do so.
+3. Open an image much larger than the window and click a rectangle. The caption must report the size in original pixels, not on-screen pixels, and must not change when you resize the window.
+4. Click an empty area of the image. The preview should clear.
+5. Open another image. The preview should clear.
+
 ## Limitations and notes
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
 - Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
 - Rectangle geometry is stored in original-image pixels and is reset to the default layout every time an image is opened. Whether positions should carry over between images is left for a later stage.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
-- No automated tests yet. Tests for the non-GUI modules are planned from Stage 5 onward.
-- Cropping and saving are intentionally not implemented yet. The plate field is not validated until saving exists (Stage 6).
+- Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop preview is enlarged or reduced for display only; the crop itself is never resized or filtered.
+- Automated tests cover the non-GUI logic only (`crop_service`); GUI behavior is checked manually with the steps above.
+- Saving is intentionally not implemented yet. The plate field is not validated until saving exists (Stage 6).

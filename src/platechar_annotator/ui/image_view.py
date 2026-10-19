@@ -57,10 +57,15 @@ class ImageView(QGraphicsView):
     # (index, x, y, width, height) in original-image pixel coordinates.
     rectangle_changed = Signal(int, float, float, float, float)
 
+    # Emitted when the selection changes: the selected rectangle's index, or
+    # 0 when no rectangle is selected.
+    rectangle_selected = Signal(int)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
+        self._scene.selectionChanged.connect(self._on_selection_changed)
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._rect_items: list[RectOverlayItem] = []
 
@@ -72,11 +77,15 @@ class ImageView(QGraphicsView):
 
     def set_image(self, image: Image.Image) -> None:
         """Replace the displayed image, dropping any rectangle overlays."""
+        # Qt deletes the old items in clear(); keep it from calling back into us.
+        self._scene.blockSignals(True)
         self._scene.clear()
+        self._scene.blockSignals(False)
         self._rect_items = []  # clear() already deleted the overlay items.
         self._pixmap_item = self._scene.addPixmap(pil_to_qpixmap(image))
         self._scene.setSceneRect(self._pixmap_item.boundingRect())
         self.fit_to_view()
+        self.rectangle_selected.emit(0)  # The old selection no longer exists.
 
     def set_rectangles(self, rectangles: Sequence[CharacterRect]) -> None:
         """Draw one overlay per rectangle, replacing any previous overlays.
@@ -88,9 +97,12 @@ class ImageView(QGraphicsView):
         if self._pixmap_item is None:
             return  # No image loaded: nothing to overlay.
 
+        self._scene.blockSignals(True)
         for item in self._rect_items:
             self._scene.removeItem(item)
+        self._scene.blockSignals(False)
         self._rect_items = [self._add_rect_overlay(rect) for rect in rectangles]
+        self.rectangle_selected.emit(0)  # Fresh overlays start unselected.
 
     def _add_rect_overlay(self, rect: CharacterRect) -> RectOverlayItem:
         """Add the interactive overlay for one rectangle."""
@@ -111,6 +123,16 @@ class ImageView(QGraphicsView):
         self.rectangle_changed.emit(
             index, rect.x(), rect.y(), rect.width(), rect.height()
         )
+
+    def _on_selection_changed(self) -> None:
+        """Report which rectangle (if any) is now selected."""
+        selected = [
+            item
+            for item in self._scene.selectedItems()
+            if isinstance(item, RectOverlayItem)
+        ]
+        index = selected[0].character_index if selected else 0
+        self.rectangle_selected.emit(index)
 
     def fit_to_view(self) -> None:
         """Scale the view so the whole image is visible."""
