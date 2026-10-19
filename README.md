@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 6 (filename generation and individual saving).
+**Current status:** Stage 6 (saving) with zoom and on-demand rectangle placement.
 
 ## Install
 
@@ -38,7 +38,7 @@ Desktop tool for manually extracting individual characters from license plate im
 
 ## How to test Stage 3
 
-1. Open an image. Seven rectangles, numbered 1 to 7 from left to right, should appear over it, each in a different color.
+1. Open an image, then click **Place rectangles**. Seven rectangles, numbered 1 to 7 from left to right, should appear over the image, each in a different color.
 2. Resize the window. The rectangles must stay aligned with the same parts of the image, and their outlines must keep a constant thickness.
 3. Open an image with different dimensions. The rectangles should be recalculated for the new image.
 
@@ -51,13 +51,16 @@ Desktop tool for manually extracting individual characters from license plate im
 5. Resize the window, then drag again. The rectangle must still follow the cursor exactly.
 6. Click an empty area of the image. The selection should clear.
 
-## How to test Stage 5
+## How to test zoom and on-demand rectangles
 
-1. Click rectangle 3. The **Crop preview** panel on the right should show only the pixels inside that rectangle, with a caption giving its size in original pixels.
-2. Drag and resize the rectangle. The preview must update while you do so.
-3. Open an image much larger than the window and click a rectangle. The caption must report the size in original pixels, not on-screen pixels, and must not change when you resize the window.
-4. Click an empty area of the image. The preview should clear.
-5. Open another image. The preview should clear.
+1. Open an image. No rectangles should appear, and the image should fit the window.
+2. Click **Zoom +** and **Zoom −** (or use the mouse wheel). The image should zoom around the viewport center and keep its aspect ratio.
+3. Click **Fit**. The image should return to fitting the window.
+4. Resize the window after zooming. The zoom level must be kept until **Fit** is used or another image is opened.
+5. Click **Place rectangles**. Seven rectangles should appear over the image.
+6. Click the same button (**Hide rectangles**). The rectangles should disappear but keep their positions.
+7. Click it again. The rectangles should reappear in the same positions.
+8. Open another image. The rectangles must disappear and be reset, and **Place rectangles** must create a fresh default layout for the new image.
 
 ## How to test Stage 6
 
@@ -73,9 +76,10 @@ Desktop tool for manually extracting individual characters from license plate im
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
 - Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
-- Rectangle geometry is stored in original-image pixels and is reset to the default layout every time an image is opened. Whether positions should carry over between images is left for a later stage.
+- Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked; hiding them afterwards keeps their positions for the current image. Whether positions should carry over between images is left for a later stage.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
-- Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop preview is enlarged or reduced for display only; the crop itself is never resized or filtered.
+- Zoom is display-only: it never changes the stored rectangle coordinates or the saved crops.
+- Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop itself is never resized or filtered.
 - Output files are always PNG, named `{source_stem}_{character}.png`. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels.
 - Existing files are never overwritten silently: saving stops and asks to overwrite all, skip all, or cancel. There is no per-file choice, and skipping some positions is done via spaces in the plate field.
 - The plate field is not cleared after a successful save. Clearing it after saving is deferred to the workflow-refinement stage.

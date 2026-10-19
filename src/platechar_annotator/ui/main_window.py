@@ -17,7 +17,7 @@ from platechar_annotator.models.selection import (
     CharacterRect,
     create_default_rectangles,
 )
-from platechar_annotator.services.crop_service import CropError, crop_character
+from platechar_annotator.services.crop_service import CropError
 from platechar_annotator.services.image_service import (
     ImageLoadError,
     LoadedImage,
@@ -29,7 +29,6 @@ from platechar_annotator.services.save_service import (
     save_crops,
 )
 from platechar_annotator.ui import dialogs
-from platechar_annotator.ui.crop_preview import CropPreview
 from platechar_annotator.ui.image_view import ImageView
 
 
@@ -45,10 +44,28 @@ class MainWindow(QMainWindow):
         self._last_directory: Path | None = None
         self._destination_folder: Path | None = None
         self._rectangles: list[CharacterRect] = []
-        self._selected_index: int | None = None
+        self._rectangles_visible = False
+
+        self._image_view = ImageView()
+        self._image_view.rectangle_changed.connect(self._on_rectangle_changed)
 
         self._open_button = QPushButton("Open image…")
         self._open_button.clicked.connect(self._on_open_image)
+
+        self._place_button = QPushButton("Place rectangles")
+        self._place_button.setToolTip(
+            "Show the seven character rectangles over the image"
+        )
+        self._place_button.clicked.connect(self._on_place_rectangles)
+
+        self._zoom_out_button = QPushButton("Zoom −")
+        self._zoom_out_button.clicked.connect(self._image_view.zoom_out)
+
+        self._zoom_in_button = QPushButton("Zoom +")
+        self._zoom_in_button.clicked.connect(self._image_view.zoom_in)
+
+        self._fit_button = QPushButton("Fit")
+        self._fit_button.clicked.connect(self._image_view.fit_to_view)
 
         self._save_button = QPushButton("Save characters…")
         self._save_button.clicked.connect(self._on_save)
@@ -69,14 +86,12 @@ class MainWindow(QMainWindow):
 
         self._folder_label = QLabel("No destination folder selected.")
 
-        self._image_view = ImageView()
-        self._image_view.rectangle_changed.connect(self._on_rectangle_changed)
-        self._image_view.rectangle_selected.connect(self._on_rectangle_selected)
-
-        self._crop_preview = CropPreview()
-
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._open_button)
+        toolbar.addWidget(self._place_button)
+        toolbar.addWidget(self._zoom_out_button)
+        toolbar.addWidget(self._zoom_in_button)
+        toolbar.addWidget(self._fit_button)
         toolbar.addWidget(self._save_button)
         toolbar.addWidget(self._path_label, stretch=1)
 
@@ -91,16 +106,12 @@ class MainWindow(QMainWindow):
         status_row = QHBoxLayout()
         status_row.addWidget(self._status_label, stretch=1)
 
-        body = QHBoxLayout()
-        body.addWidget(self._image_view, stretch=1)
-        body.addWidget(self._crop_preview)
-
         layout = QVBoxLayout()
         layout.addLayout(toolbar)
         layout.addLayout(plate_row)
         layout.addLayout(folder_row)
         layout.addLayout(status_row)
-        layout.addLayout(body, stretch=1)
+        layout.addWidget(self._image_view, stretch=1)
 
         central = QWidget()
         central.setLayout(layout)
@@ -140,10 +151,35 @@ class MainWindow(QMainWindow):
 
         self._current_image = loaded
         self._last_directory = path.parent
-        self._rectangles = create_default_rectangles(loaded.width, loaded.height)
-        self._image_view.set_image(loaded.pixels)
-        self._image_view.set_rectangles(self._rectangles)
+        # Rectangles are hidden and reset every time a new image is opened.
+        self._rectangles = []
+        self._rectangles_visible = False
+        self._place_button.setText("Place rectangles")
+        self._image_view.set_image(loaded.pixels)  # Drops any rectangle overlays.
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
+        self._status_label.setText("")
+
+    def _on_place_rectangles(self) -> None:
+        """Show the rectangles on demand, or hide them if already visible."""
+        image = self._current_image
+        if image is None:
+            dialogs.show_error(
+                self, "Cannot place rectangles", "Open an image first."
+            )
+            return
+
+        if self._rectangles_visible:
+            # Hide the overlays but keep the geometry for re-showing.
+            self._image_view.set_rectangles([])
+            self._rectangles_visible = False
+            self._place_button.setText("Place rectangles")
+            return
+
+        if not self._rectangles:
+            self._rectangles = create_default_rectangles(image.width, image.height)
+        self._image_view.set_rectangles(self._rectangles)
+        self._rectangles_visible = True
+        self._place_button.setText("Hide rectangles")
 
     def _on_select_folder(self) -> None:
         folder = dialogs.ask_directory(self, self._destination_folder)
@@ -162,30 +198,6 @@ class MainWindow(QMainWindow):
             if rect.index == index:
                 rect.x, rect.y, rect.width, rect.height = x, y, width, height
                 break
-
-        if index == self._selected_index:
-            self._refresh_preview()
-
-    def _on_rectangle_selected(self, index: int) -> None:
-        """Track the selected rectangle (0 = none) and refresh the preview."""
-        self._selected_index = index or None
-        self._refresh_preview()
-
-    def _refresh_preview(self) -> None:
-        """Preview the selected rectangle's crop from the original image."""
-        index = self._selected_index
-        image = self._current_image
-        rect = next((r for r in self._rectangles if r.index == index), None)
-        if image is None or rect is None:
-            self._crop_preview.clear_preview()
-            return
-
-        try:
-            crop = crop_character(image.pixels, rect)
-        except CropError as exc:
-            self._crop_preview.show_message(str(exc))
-            return
-        self._crop_preview.show_crop(rect.index, crop)
 
     def _on_save(self) -> None:
         """Validate everything, then save the non-empty character crops."""
