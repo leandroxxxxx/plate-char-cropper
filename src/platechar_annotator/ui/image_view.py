@@ -73,6 +73,7 @@ class ImageView(QGraphicsView):
         self._rect_items: list[RectOverlayItem] = []
         self._manual_zoom = False  # True once the user zooms, until fit/reset.
         self._pan_last_pos: QPoint | None = None  # Set while middle-dragging.
+        self._aspect_ratio: float | None = None  # None = free resizing.
 
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.setBackgroundBrush(QBrush(QColor(40, 40, 40)))
@@ -102,6 +103,15 @@ class ImageView(QGraphicsView):
             self._scene.removeItem(item)
         self._rect_items = [self._add_rect_overlay(rect) for rect in rectangles]
 
+    def set_aspect_ratio(self, ratio: float | None) -> None:
+        """Lock rectangle resizing to width/height == ratio (None = free).
+
+        Applies to the current overlays and to any created later.
+        """
+        self._aspect_ratio = ratio
+        for item in self._rect_items:
+            item.set_aspect_ratio(ratio)
+
     def _add_rect_overlay(self, rect: CharacterRect) -> RectOverlayItem:
         """Add the interactive overlay for one rectangle."""
         color = QColor(_RECT_COLOR_HEX[(rect.index - 1) % len(_RECT_COLOR_HEX)])
@@ -112,6 +122,7 @@ class ImageView(QGraphicsView):
             color,
             self._on_overlay_changed,
         )
+        item.set_aspect_ratio(self._aspect_ratio)
 
         self._scene.addItem(item)
         return item

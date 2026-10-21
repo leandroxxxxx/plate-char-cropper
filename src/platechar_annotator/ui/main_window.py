@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtCore import QRegularExpression
+from PySide6.QtGui import QFontDatabase, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -17,6 +18,7 @@ from platechar_annotator.models.selection import (
     CharacterRect,
     create_rectangles_in_region,
 )
+from platechar_annotator.services.aspect_ratio import parse_aspect_ratio
 from platechar_annotator.services.crop_service import CropError
 from platechar_annotator.services.image_service import (
     ImageLoadError,
@@ -81,6 +83,11 @@ class MainWindow(QMainWindow):
             QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         )
 
+        self._ratio_width_input = self._create_ratio_input("W")
+        self._ratio_height_input = self._create_ratio_input("H")
+        self._ratio_width_input.textChanged.connect(self._on_aspect_ratio_changed)
+        self._ratio_height_input.textChanged.connect(self._on_aspect_ratio_changed)
+
         self._folder_button = QPushButton("Select destination folder…")
         self._folder_button.clicked.connect(self._on_select_folder)
 
@@ -98,6 +105,10 @@ class MainWindow(QMainWindow):
         plate_row = QHBoxLayout()
         plate_row.addWidget(QLabel("Plate:"))
         plate_row.addWidget(self._plate_input, stretch=1)
+        plate_row.addWidget(QLabel("Aspect ratio W:H"))
+        plate_row.addWidget(self._ratio_width_input)
+        plate_row.addWidget(QLabel(":"))
+        plate_row.addWidget(self._ratio_height_input)
 
         folder_row = QHBoxLayout()
         folder_row.addWidget(self._folder_button)
@@ -136,6 +147,19 @@ class MainWindow(QMainWindow):
     def destination_folder(self) -> Path | None:
         """The selected destination folder, if any."""
         return self._destination_folder
+
+    def _create_ratio_input(self, placeholder: str) -> QLineEdit:
+        """Create one aspect-ratio field (positive number, '.' or ',' decimals)."""
+        field = QLineEdit()
+        field.setPlaceholderText(placeholder)
+        field.setFixedWidth(60)
+        pattern = QRegularExpression(r"[0-9]*[.,]?[0-9]*")
+        field.setValidator(QRegularExpressionValidator(pattern, field))
+        field.setToolTip(
+            "Locks the rectangle aspect ratio while resizing. "
+            "Fill both W and H; leave either empty for free resizing."
+        )
+        return field
 
     def _on_open_image(self) -> None:
         path = dialogs.ask_image_path(self, self._last_directory)
@@ -193,6 +217,13 @@ class MainWindow(QMainWindow):
         self._destination_folder = folder
         self._folder_label.setText(str(folder))
         self._folder_label.setToolTip(str(folder))
+
+    def _on_aspect_ratio_changed(self) -> None:
+        """Apply the W:H fields to the rectangles' resize behaviour."""
+        ratio = parse_aspect_ratio(
+            self._ratio_width_input.text(), self._ratio_height_input.text()
+        )
+        self._image_view.set_aspect_ratio(ratio)
 
     def _on_rectangle_changed(
         self, index: int, x: float, y: float, width: float, height: float

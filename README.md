@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 6 (saving) with zoom and on-demand rectangle placement.
+**Current status:** Stage 6 (saving) with zoom, on-demand rectangle placement and an optional aspect-ratio lock.
 
 ## Install
 
@@ -72,6 +72,16 @@ Desktop tool for manually extracting individual characters from license plate im
 6. Enter a plate containing a filename-invalid character (e.g. `A/B1D23`) and save. The output filename must use an underscore in place of the invalid character.
 7. Try saving without selecting a destination folder. An error must appear.
 
+## How to test the aspect-ratio lock
+
+1. Open an image and click **Place rectangles**. Leave the **W** and **H** fields empty and resize a rectangle by a corner. It must resize freely.
+2. Enter `1` in **W** and `2` in **H**. Resize a rectangle by dragging a corner. The opposite corner must stay fixed, and the rectangle must keep a width:height ratio of 1:2 throughout the drag.
+3. Drag a side edge (left, right, top or bottom). The opposite edge must stay fixed, and the other dimension must follow the ratio, staying centered on the rectangle.
+4. Drag past the image border or shrink the rectangle to the minimum. It must stop at the limit without breaking the ratio.
+5. Move a rectangle by its body. Moving must not change its shape.
+6. Change the ratio (for example `3` and `1`) while a rectangle is selected. Its shape must not change by itself; it should snap to the new ratio the first time you resize it.
+7. Use a decimal ratio such as `2,5` and `5` (a comma works as well as a period). Then clear either field. Resizing must become free again.
+
 ## Limitations and notes
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
@@ -79,9 +89,10 @@ Desktop tool for manually extracting individual characters from license plate im
 - Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked, which lays all seven out inside the currently visible (possibly zoomed) area; clicking it again re-places them in the new view, discarding manual adjustments. Whether positions should carry over between images is left for a later stage.
 - Wheel zoom centers on the cursor and middle-drag pans, so the part of interest can be brought into view before placing the rectangles.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
+- The aspect-ratio lock (**W** and **H** fields) applies only to resizing, and only when both fields hold a positive number (`.` or `,` as decimal separator). Changing the ratio does not reshape existing rectangles; a rectangle snaps to the ratio the next time it is resized. **Place rectangles** ignores the ratio.
 - Zoom is display-only: it never changes the stored rectangle coordinates or the saved crops.
 - Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop itself is never resized or filtered.
 - Output files are always PNG, named `{source_stem}_{character}.png`. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels.
 - Existing files are never overwritten silently: saving stops and asks to overwrite all, skip all, or cancel. There is no per-file choice, and skipping some positions is done via spaces in the plate field.
 - The plate field is not cleared after a successful save. Clearing it after saving is deferred to the workflow-refinement stage.
-- Automated tests cover the non-GUI logic only (`crop_service`, `filename_service`, `save_service`); GUI behavior is checked manually with the steps above.
+- Automated tests cover the non-GUI logic and the pure resize math (`crop_service`, `filename_service`, `save_service`, `aspect_ratio`, and the locked-resize function in `rect_item`); GUI behavior is checked manually with the steps above.

@@ -95,6 +95,95 @@ def _resized_rect(
     return QRectF(QPointF(left, top), QPointF(right, bottom))
 
 
+def _axis(
+    start_low: float,
+    start_high: float,
+    drag_low: bool,
+    delta: float,
+    bound_low: float,
+    bound_high: float,
+) -> tuple[float, float, float]:
+    """Resolve one axis of a drag.
+
+    Returns ``(anchor, desired_length, room)``: the fixed coordinate (the side
+    opposite the dragged one), the length the cursor asks for, and the space
+    between the anchor and the bound on the dragged side.
+    """
+    if drag_low:
+        return start_high, start_high - (start_low + delta), start_high - bound_low
+    return start_low, (start_high + delta) - start_low, bound_high - start_low
+
+
+def _locked_extent(desired: float, minimum: float, maximum: float) -> float | None:
+    """Clamp ``desired`` to [minimum, maximum]; None if that range is empty."""
+    if maximum < minimum:
+        return None
+    return min(max(desired, minimum), maximum)
+
+
+def _resized_rect_locked(
+    start: QRectF, edges: _Edge, dx: float, dy: float, bounds: QRectF, ratio: float
+) -> QRectF:
+    """Like ``_resized_rect`` but keeps ``width / height == ratio``.
+
+    A dragged corner keeps the opposite corner fixed. A dragged side edge keeps
+    the opposite edge fixed and centres the other dimension on the start
+    rectangle. The result stays inside bounds and above the minimum size; if no
+    such size exists, the start rectangle is returned unchanged.
+    """
+    on_left = bool(edges & _Edge.LEFT)
+    on_top = bool(edges & _Edge.TOP)
+    horizontal = on_left or bool(edges & _Edge.RIGHT)
+    vertical = on_top or bool(edges & _Edge.BOTTOM)
+    if not (horizontal or vertical):
+        return QRectF(start)
+
+    center = start.center()
+    min_width = max(_MIN_SIZE, _MIN_SIZE * ratio)
+    min_height = max(_MIN_SIZE, _MIN_SIZE / ratio)
+
+    if horizontal and vertical:  # Corner: the opposite corner stays fixed.
+        anchor_x, desired_w, room_x = _axis(
+            start.left(), start.right(), on_left, dx, bounds.left(), bounds.right()
+        )
+        anchor_y, desired_h, room_y = _axis(
+            start.top(), start.bottom(), on_top, dy, bounds.top(), bounds.bottom()
+        )
+        width = _locked_extent(
+            max(desired_w, desired_h * ratio), min_width, min(room_x, room_y * ratio)
+        )
+        if width is None:
+            return QRectF(start)
+        height = width / ratio
+        left = anchor_x - width if on_left else anchor_x
+        top = anchor_y - height if on_top else anchor_y
+        return QRectF(left, top, width, height)
+
+    if horizontal:  # Left or right edge: height follows, centred vertically.
+        anchor_x, desired_w, room_x = _axis(
+            start.left(), start.right(), on_left, dx, bounds.left(), bounds.right()
+        )
+        room_y = 2 * min(center.y() - bounds.top(), bounds.bottom() - center.y())
+        width = _locked_extent(desired_w, min_width, min(room_x, room_y * ratio))
+        if width is None:
+            return QRectF(start)
+        height = width / ratio
+        left = anchor_x - width if on_left else anchor_x
+        return QRectF(left, center.y() - height / 2, width, height)
+
+    # Top or bottom edge: width follows, centred horizontally.
+    anchor_y, desired_h, room_y = _axis(
+        start.top(), start.bottom(), on_top, dy, bounds.top(), bounds.bottom()
+    )
+    room_x = 2 * min(center.x() - bounds.left(), bounds.right() - center.x())
+    height = _locked_extent(desired_h, min_height, min(room_y, room_x / ratio))
+    if height is None:
+        return QRectF(start)
+    width = height * ratio
+    top = anchor_y - height if on_top else anchor_y
+    return QRectF(center.x() - width / 2, top, width, height)
+
+
 class RectOverlayItem(QGraphicsRectItem):
     """A character rectangle that can be selected, moved and resized.
 
@@ -113,6 +202,7 @@ class RectOverlayItem(QGraphicsRectItem):
         self.character_index = character_index
         self._color = QColor(color)
         self._on_changed = on_changed
+        self._aspect_ratio: float | None = None  # None = free resizing.
 
         self._drag_edges = _Edge.NONE
         self._drag_start_scene: QPointF | None = None
@@ -125,6 +215,14 @@ class RectOverlayItem(QGraphicsRectItem):
         self._handles = self._create_handles()
         self._apply_style(selected=False)
         self._update_children()
+
+    def set_aspect_ratio(self, ratio: float | None) -> None:
+        """Lock resizing to width/height == ratio, or free it with None.
+
+        Only edge and corner drags are affected. The current shape is kept
+        until the next resize, which then snaps to the ratio.
+        """
+        self._aspect_ratio = ratio if ratio is not None and ratio > 0 else None
 
     # ----- construction helpers -----
 
@@ -240,9 +338,18 @@ class RectOverlayItem(QGraphicsRectItem):
         bounds = self.scene().sceneRect()
         if self._drag_edges == _Edge.NONE:
             new_rect = _moved_rect(self._drag_start_rect, delta.x(), delta.y(), bounds)
-        else:
+        elif self._aspect_ratio is None:
             new_rect = _resized_rect(
                 self._drag_start_rect, self._drag_edges, delta.x(), delta.y(), bounds
+            )
+        else:
+            new_rect = _resized_rect_locked(
+                self._drag_start_rect,
+                self._drag_edges,
+                delta.x(),
+                delta.y(),
+                bounds,
+                self._aspect_ratio,
             )
         self._set_geometry(new_rect)
         event.accept()
