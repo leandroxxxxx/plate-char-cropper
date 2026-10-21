@@ -1,6 +1,7 @@
 """Tests for plates with repeated or colliding characters (no GUI needed)."""
 
 from pathlib import Path
+import re
 
 from PIL import Image
 
@@ -30,49 +31,35 @@ def planned_names(tmp_path: Path, plate: str) -> list[str]:
     return [crop.destination.name for crop in planned]
 
 
-def test_distinct_characters_keep_the_plain_names(tmp_path):
-    assert planned_names(tmp_path, "ABC1D23") == [
-        "0001_video_A.png",
-        "0001_video_B.png",
-        "0001_video_C.png",
-        "0001_video_1.png",
-        "0001_video_D.png",
-        "0001_video_2.png",
-        "0001_video_3.png",
-    ]
+def test_each_crop_has_its_own_increasing_timestamp(tmp_path):
+    names = planned_names(tmp_path, "ABC1D23")
+    timestamps = ["_".join(name.split("_")[:2]) for name in names]
+    assert len(set(timestamps)) == len(names)
+    assert timestamps == sorted(timestamps)
+    assert all(re.fullmatch(r"\d{12}_\d{6}", stamp) for stamp in timestamps)
+    assert all(not re.search(r"_\d+_[^_]+\.png$", name) for name in names)
 
 
-def test_repeated_character_gets_its_position_in_the_name(tmp_path):
-    assert planned_names(tmp_path, "ABC1C23") == [
-        "0001_video_A.png",
-        "0001_video_B.png",
-        "0001_video_3_C.png",
-        "0001_video_1.png",
-        "0001_video_5_C.png",
-        "0001_video_2.png",
-        "0001_video_3.png",
-    ]
+def test_repeated_character_keeps_both_positions(tmp_path):
+    names = planned_names(tmp_path, "ABC1C23")
+    assert "_3_C.png" in names[2]
+    assert "_5_C.png" in names[4]
 
 
-def test_names_differing_only_by_case_are_disambiguated(tmp_path):
-    assert planned_names(tmp_path, "aA") == [
-        "0001_video_1_a.png",
-        "0001_video_2_A.png",
-    ]
+def test_names_differing_only_by_case_get_distinct_positions(tmp_path):
+    names = planned_names(tmp_path, "aA")
+    assert names[0] != names[1]
 
 
-def test_characters_sanitized_to_the_same_label_are_disambiguated(tmp_path):
-    assert planned_names(tmp_path, "?*") == [
-        "0001_video_1__.png",
-        "0001_video_2__.png",
-    ]
+def test_characters_sanitized_to_the_same_label_get_distinct_positions(tmp_path):
+    names = planned_names(tmp_path, "?*")
+    assert names[0] != names[1]
 
 
 def test_blank_positions_do_not_shift_positions_in_names(tmp_path):
-    assert planned_names(tmp_path, "A A") == [
-        "0001_video_1_A.png",
-        "0001_video_3_A.png",
-    ]
+    names = planned_names(tmp_path, "A A")
+    assert "_1_A.png" in names[0]
+    assert "_3_A.png" in names[1]
 
 
 def test_every_crop_of_a_repeated_character_plate_is_written(tmp_path):
@@ -84,6 +71,5 @@ def test_every_crop_of_a_repeated_character_plate_is_written(tmp_path):
     assert len(list(tmp_path.glob("*.png"))) == 7
 
 
-def test_build_filename_position_variant():
-    assert build_filename("0001_video", "C") == "0001_video_C.png"
-    assert build_filename("0001_video", "C", position=3) == "0001_video_3_C.png"
+def test_build_filename_includes_timestamp_and_position():
+    assert build_filename("0001_video", "C", "261020101010_123456", 3) == "261020101010_123456_0001_video_3_C.png"

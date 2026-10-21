@@ -194,9 +194,13 @@ def test_existing_flag_is_set_when_file_already_exists(tmp_path):
     folder = tmp_path / "out"
     folder.mkdir()
     image = make_loaded_image((200, 100))
-    first = prepare_save(image, "A", create_default_rectangles(200, 100), folder)
+    first = prepare_save(
+        image, "A", create_default_rectangles(200, 100), folder, timestamp="123456789"
+    )
     save_crops(first, overwrite_existing=True)
 
-    second = prepare_save(image, "A", create_default_rectangles(200, 100), folder)
+    second = prepare_save(
+        image, "A", create_default_rectangles(200, 100), folder, timestamp="123456789"
+    )
 
     assert second[0].exists is True

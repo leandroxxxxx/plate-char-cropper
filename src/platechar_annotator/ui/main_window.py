@@ -29,6 +29,10 @@ from platechar_annotator.services.image_service import (
     LoadedImage,
     load_image,
 )
+from platechar_annotator.services.local_config import (
+    load_default_aspect_ratio,
+    load_group_pan_range_fraction,
+)
 from platechar_annotator.services.save_service import (
     SaveError,
     prepare_save,
@@ -75,6 +79,17 @@ class MainWindow(QMainWindow):
         )
         self._size_slider.valueChanged.connect(self._on_size_changed)
 
+        self._pan_horizontal_slider = self._create_pan_slider("Move all rectangles horizontally")
+        self._pan_vertical_slider = self._create_pan_slider("Move all rectangles vertically")
+        self._pan_range_fraction = load_group_pan_range_fraction()
+        self._pan_horizontal_slider.valueChanged.connect(
+            lambda value: self._on_group_pan_changed("x", value)
+        )
+        self._pan_vertical_slider.valueChanged.connect(
+            lambda value: self._on_group_pan_changed("y", value)
+        )
+        self._pan_last_values = {"x": 0, "y": 0}
+
         self._save_button = QPushButton("Save characters…")
         self._save_button.clicked.connect(self._on_save)
 
@@ -91,6 +106,9 @@ class MainWindow(QMainWindow):
 
         self._ratio_width_input = self._create_ratio_input("W")
         self._ratio_height_input = self._create_ratio_input("H")
+        default_width, default_height = load_default_aspect_ratio()
+        self._ratio_width_input.setText(f"{default_width:g}")
+        self._ratio_height_input.setText(f"{default_height:g}")
         self._ratio_width_input.textChanged.connect(self._on_aspect_ratio_changed)
         self._ratio_height_input.textChanged.connect(self._on_aspect_ratio_changed)
 
@@ -115,6 +133,12 @@ class MainWindow(QMainWindow):
         plate_row.addWidget(QLabel(":"))
         plate_row.addWidget(self._ratio_height_input)
 
+        pan_row = QHBoxLayout()
+        pan_row.addWidget(QLabel("Move all horizontally:"))
+        pan_row.addWidget(self._pan_horizontal_slider, stretch=1)
+        pan_row.addWidget(QLabel("Move all vertically:"))
+        pan_row.addWidget(self._pan_vertical_slider, stretch=1)
+
         folder_row = QHBoxLayout()
         folder_row.addWidget(self._folder_button)
         folder_row.addWidget(self._folder_label, stretch=1)
@@ -125,6 +149,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addLayout(toolbar)
         layout.addLayout(plate_row)
+        layout.addLayout(pan_row)
         layout.addLayout(folder_row)
         layout.addLayout(status_row)
         layout.addWidget(self._image_view, stretch=1)
@@ -166,6 +191,16 @@ class MainWindow(QMainWindow):
         )
         return field
 
+    @staticmethod
+    def _create_pan_slider(tooltip: str) -> QSlider:
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(-1000, 1000)
+        slider.setValue(0)
+        slider.setSingleStep(1)
+        slider.setPageStep(10)
+        slider.setToolTip(tooltip)
+        return slider
+
     def _on_open_image(self) -> None:
         path = dialogs.ask_image_path(self, self._last_directory)
         if path is None:
@@ -183,6 +218,7 @@ class MainWindow(QMainWindow):
         # Rectangles are hidden and reset every time a new image is opened.
         self._rectangles = []
         self._rectangles_visible = False
+        self._reset_pan_sliders()
         self._place_button.setText("Place rectangles")
         self._image_view.set_image(loaded.pixels)  # Drops any rectangle overlays.
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
@@ -219,6 +255,7 @@ class MainWindow(QMainWindow):
             aspect_ratio=self._current_aspect_ratio(),
             size_fraction=self._size_slider.value() / 100,
         )
+        self._reset_pan_sliders()
         self._image_view.set_rectangles(self._rectangles)
         self._rectangles_visible = True
         self._place_button.setText("Re-place rectangles")
@@ -232,6 +269,47 @@ class MainWindow(QMainWindow):
         """
         if self._rectangles_visible:
             self._on_place_rectangles()
+
+    def _reset_pan_sliders(self) -> None:
+        self._pan_horizontal_slider.blockSignals(True)
+        self._pan_vertical_slider.blockSignals(True)
+        self._pan_horizontal_slider.setValue(0)
+        self._pan_vertical_slider.setValue(0)
+        self._pan_horizontal_slider.blockSignals(False)
+        self._pan_vertical_slider.blockSignals(False)
+        self._pan_last_values = {"x": 0, "y": 0}
+
+    def _on_group_pan_changed(self, axis: str, value: int) -> None:
+        """Translate every rectangle together, keeping the group in the image."""
+        if not self._rectangles or self._current_image is None:
+            self._pan_last_values[axis] = value
+            return
+
+        image = self._current_image
+        dimension = image.width if axis == "x" else image.height
+        step = dimension * self._pan_range_fraction / 1000
+        delta = (value - self._pan_last_values[axis]) * step
+        low = min(rect.x if axis == "x" else rect.y for rect in self._rectangles)
+        high = max(
+            (rect.x + rect.width) if axis == "x" else (rect.y + rect.height)
+            for rect in self._rectangles
+        )
+        limit = dimension
+        delta = min(max(delta, -low), limit - high)
+        for rect in self._rectangles:
+            if axis == "x":
+                rect.x += delta
+            else:
+                rect.y += delta
+        actual_steps = round(delta / step) if step else 0
+        effective_value = self._pan_last_values[axis] + actual_steps
+        slider = self._pan_horizontal_slider if axis == "x" else self._pan_vertical_slider
+        if effective_value != value:
+            slider.blockSignals(True)
+            slider.setValue(effective_value)
+            slider.blockSignals(False)
+        self._pan_last_values[axis] = effective_value
+        self._image_view.set_rectangles(self._rectangles)
 
     def _on_select_folder(self) -> None:
         folder = dialogs.ask_directory(self, self._destination_folder)

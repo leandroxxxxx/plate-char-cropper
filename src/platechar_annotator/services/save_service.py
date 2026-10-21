@@ -7,6 +7,7 @@ partially completed save behind. No GUI dependencies.
 import os
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Sequence
 
@@ -67,6 +68,8 @@ def prepare_save(
     plate_text: str,
     rectangles: Sequence[CharacterRect],
     destination_folder: Path | str | None,
+    *,
+    timestamp: str | None = None,
 ) -> list[PlannedCrop]:
     """Validate everything and build the save plan without writing files.
 
@@ -109,24 +112,31 @@ def prepare_save(
         crop = crop_character(image.pixels, rect)  # CropError propagates.
         crops.append((index, character, crop))
 
-    # Plain names are ``{stem}_{character}.png``. If two crops would get the
-    # same name (a repeated character, or different characters sanitized to
-    # the same label), every crop in that group also gets its position in the
-    # name, so none overwrites another. Names are compared case-insensitively
-    # because Windows treats ``a.png`` and ``A.png`` as the same file.
-    plain_name_counts = Counter(
-        destination_path(folder, image.path, character).name.casefold()
+    # Position is added only when repeated or sanitized labels collide. Give
+    # every crop its own increasing local timestamp so the prefixes sort too.
+    plain_names = [
+        destination_path(folder, image.path, character, timestamp="").name.casefold()
         for _, character, _ in crops
-    )
-
+    ]
+    name_counts = Counter(plain_names)
     planned: list[PlannedCrop] = []
+    last_timestamp: datetime | None = None
     for index, character, crop in crops:
-        plain = destination_path(folder, image.path, character)
-        collides = plain_name_counts[plain.name.casefold()] > 1
-        destination = (
-            destination_path(folder, image.path, character, position=index)
-            if collides
-            else plain
+        if timestamp is None:
+            current_timestamp = datetime.now()
+            if last_timestamp is not None and current_timestamp <= last_timestamp:
+                current_timestamp = last_timestamp + timedelta(microseconds=1)
+            crop_timestamp = current_timestamp.strftime("%y%m%d%H%M%S_%f")
+            last_timestamp = current_timestamp
+        else:
+            crop_timestamp = timestamp
+        plain = destination_path(folder, image.path, character, timestamp="")
+        destination = destination_path(
+            folder,
+            image.path,
+            character,
+            timestamp=crop_timestamp,
+            position=index if name_counts[plain.name.casefold()] > 1 else None,
         )
         planned.append(
             PlannedCrop(

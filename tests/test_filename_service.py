@@ -22,7 +22,7 @@ def test_source_stem_removes_only_the_final_extension():
 
 def test_build_filename_follows_the_documented_convention():
     stem = source_stem(Path("0001_video_00-01-23.450.png"))
-    assert build_filename(stem, "A") == "0001_video_00-01-23.450_A.png"
+    assert build_filename(stem, "A", "261020101010_123456", 1) == "261020101010_123456_0001_video_00-01-23.450_1_A.png"
 
 
 @pytest.mark.parametrize("character", ["A", "b", "7", "-", "Á"])
@@ -47,6 +47,8 @@ def test_empty_or_all_invalid_label_becomes_underscore():
 
 
 def test_destination_path_is_inside_the_folder_with_png_extension():
-    path = destination_path(Path("/out"), Path("0001_video_00-01-23.450.png"), "B")
-    assert path == Path("/out/0001_video_00-01-23.450_B.png")
+    path = destination_path(
+        Path("/out"), Path("0001_video_00-01-23.450.png"), "B", "261020101010_123456", 2
+    )
+    assert path == Path("/out/261020101010_123456_0001_video_00-01-23.450_2_B.png")
     assert path.suffix == ".png"

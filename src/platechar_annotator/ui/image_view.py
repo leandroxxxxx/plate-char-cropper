@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from platechar_annotator.models.selection import CharacterRect
+from platechar_annotator.services.local_config import load_zoom_step_fraction
 from platechar_annotator.ui.rect_item import RectOverlayItem
 
 # Distinct overlay colors for rectangles 1..7 (left to right).
@@ -42,7 +43,6 @@ _RECT_COLOR_HEX = [
     "#f032e6",
 ]
 
-_ZOOM_STEP = 1.25  # Multiplier per click or wheel notch.
 _ZOOM_MIN = 0.05
 _ZOOM_MAX = 64.0
 
@@ -74,6 +74,7 @@ class ImageView(QGraphicsView):
         self._manual_zoom = False  # True once the user zooms, until fit/reset.
         self._pan_last_pos: QPoint | None = None  # Set while middle-dragging.
         self._aspect_ratio: float | None = None  # None = free resizing.
+        self._zoom_step_fraction = load_zoom_step_fraction()
 
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.setBackgroundBrush(QBrush(QColor(40, 40, 40)))
@@ -141,11 +142,11 @@ class ImageView(QGraphicsView):
 
     def zoom_in(self) -> None:
         """Zoom in one step around the viewport center."""
-        self.zoom_by(_ZOOM_STEP)
+        self.zoom_by(1 + self._zoom_step_fraction)
 
     def zoom_out(self) -> None:
         """Zoom out one step around the viewport center."""
-        self.zoom_by(1 / _ZOOM_STEP)
+        self.zoom_by(1 / (1 + self._zoom_step_fraction))
 
     def zoom_by(self, factor: float) -> None:
         """Multiply the zoom by ``factor``, clamped to sensible limits."""
@@ -172,7 +173,11 @@ class ImageView(QGraphicsView):
 
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 (Qt API)
         """Scroll wheel zooms in (up) and out (down), around the cursor."""
-        factor = _ZOOM_STEP if event.angleDelta().y() > 0 else 1 / _ZOOM_STEP
+        delta = event.angleDelta().y() or event.pixelDelta().y()
+        if delta == 0:
+            event.accept()
+            return
+        factor = (1 + self._zoom_step_fraction) ** (delta / 120)
         # Keep the image point under the cursor fixed, so the user can zoom
         # straight into the part of interest.
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)

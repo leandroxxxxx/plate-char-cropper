@@ -15,6 +15,10 @@ Desktop tool for manually extracting individual characters from license plate im
 
     python main.py
 
+## Local defaults
+
+Copy `.local_config.json.example` to `.local_config.json` to set defaults for this checkout. The file is ignored by Git. The default aspect ratio is 9:16; change `width` and `height` in the local file to use another ratio. `group_pan_range_fraction` sets the maximum travel from the slider center as a fraction of the image size; the default `0.1` gives each slider a ±10% range with finer movement. `zoom_step_fraction` controls wheel zoom speed per standard wheel notch; its default `0.05` changes zoom by about 5% per notch. If either setting is missing or invalid, the app uses its default.
+
 ## Run the tests
 
     pip install -r requirements-dev.txt
@@ -62,21 +66,22 @@ Desktop tool for manually extracting individual characters from license plate im
 7. Zoom or pan elsewhere and click **Re-place rectangles**. The row should be laid out again inside the new visible area.
 8. Resize the window after zooming. The zoom level must be kept until another image is opened.
 9. Open another image. The rectangles must disappear and be reset, the image must fit the window, and **Place rectangles** must create a fresh layout for the new image.
+10. Use **Move all horizontally** and **Move all vertically** to shift the full group together. The controls must stop the rectangles at the image edges.
 
 ## How to test Stage 6
 
 1. Open an image, enter `ABC1D23` in the **Plate** field, and select a destination folder.
-2. Click **Save characters…**. The status bar should report that 7 crops were saved, and the folder should contain `0001_video_00-01-23.450_A.png` … `0001_video_00-01-23.450_3.png`, each with the same pixel dimensions as its rectangle.
-3. Save again. A dialog should warn that the files already exist, offering **Overwrite All**, **Skip All**, and **Cancel**. Try each option.
+2. Click **Save characters…**. The status bar should report that 7 crops were saved. Each output filename starts with its own sortable local timestamp in `YYMMDDHHMMSS_microseconds` format, followed by the source name and character label.
+3. Save again. Each crop gets a fresh timestamp, so filenames remain separate.
 4. Clear the plate field and save. An error must appear and no files may change.
 5. Enter `AB 1D23` and save to a fresh folder. Only 6 files should appear, for positions 1, 2, 4, 5, 6, 7 (`A`, `B`, `1`, `D`, `2`, `3`). The blank position must not shift the others.
 6. Enter a plate containing a filename-invalid character (e.g. `A/B1D23`) and save. The output filename must use an underscore in place of the invalid character.
 7. Try saving without selecting a destination folder. An error must appear.
-8. Enter `ABC1C23` (a repeated character) and save to a fresh folder. All 7 files must appear; the two `C` crops must be named `..._3_C.png` and `..._5_C.png`.
+8. Enter `ABC1C23` (a repeated character) and save to a fresh folder. All 7 files must appear; the two `C` crops must retain position markers `_3_C` and `_5_C`.
 
 ## How to test the aspect-ratio lock
 
-1. Open an image and click **Place rectangles**. Leave the **W** and **H** fields empty and resize a rectangle by a corner. It must resize freely.
+1. Open an image and click **Place rectangles**. The default **W** and **H** values are 9 and 16. Clear either field, then resize a rectangle by a corner. It must resize freely.
 2. Enter `1` in **W** and `2` in **H**. Resize a rectangle by dragging a corner. The opposite corner must stay fixed, and the rectangle must keep a width:height ratio of 1:2 throughout the drag.
 3. Drag a side edge (left, right, top or bottom). The opposite edge must stay fixed, and the other dimension must follow the ratio, staying centered on the rectangle.
 4. Drag past the image border or shrink the rectangle to the minimum. It must stop at the limit without breaking the ratio.
@@ -93,9 +98,10 @@ Desktop tool for manually extracting individual characters from license plate im
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
 - The aspect-ratio lock (**W** and **H** fields) applies only when both fields hold a positive number (`.` or `,` as decimal separator). **Place rectangles** and the **Size** slider lay the rectangles out with that ratio, and resizing keeps it. Changing the fields does not reshape rectangles that are already placed; one snaps to the ratio the next time it is resized, or when the row is re-laid.
 - The **Size** slider sets the width and height of all seven rectangles together, from 10% to 100% of the largest row that fits the visible area. Without a ratio, each rectangle keeps the proportions of the visible area split into seven columns.
+- **Move all horizontally** and **Move all vertically** translate the rectangle group together in fine increments, clamped so the rectangles stay inside the image. Their range is set by `group_pan_range_fraction` in the local config. Re-placing the rectangles or opening another image resets both controls.
 - Zoom is display-only: it never changes the stored rectangle coordinates or the saved crops.
 - Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop itself is never resized or filtered.
-- Output files are always PNG, named `{source_stem}_{character}.png`. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels. If two crops of one plate would get the same name (a repeated character such as the two `C`s in `ABC1C23`, characters differing only by case, or characters sanitized to the same label), each crop in that group also gets its 1-based position before the character, e.g. `{source_stem}_3_C.png` and `{source_stem}_5_C.png`, so none is overwritten. The character is always the last part of the name.
+- Output files are always PNG, named `{YYMMDDHHMMSS_microseconds}_{source_stem}_{character}.png`. Each crop gets its own increasing local timestamp, so filename prefixes sort in crop creation order without sequence numbers. A 1-based position is added only when labels repeat or sanitize to the same text within a batch. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels.
 - Existing files are never overwritten silently: saving stops and asks to overwrite all, skip all, or cancel. There is no per-file choice, and skipping some positions is done via spaces in the plate field.
 - The plate field is not cleared after a successful save. Clearing it after saving is deferred to the workflow-refinement stage.
 - Automated tests cover the non-GUI logic and the pure resize math (`crop_service`, `filename_service`, `save_service`, `aspect_ratio`, the rectangle layout in `selection`, and the locked-resize function in `rect_item`); GUI behavior is checked manually with the steps above.

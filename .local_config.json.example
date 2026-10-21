@@ -1,0 +1,8 @@
+{
+  "aspect_ratio": {
+    "width": 9,
+    "height": 16
+  },
+  "group_pan_range_fraction": 0.1,
+  "zoom_step_fraction": 0.05
+}
