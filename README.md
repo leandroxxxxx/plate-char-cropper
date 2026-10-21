@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 6 (saving) with zoom, on-demand rectangle placement and an optional aspect-ratio lock.
+**Current status:** Stage 6 (saving) with zoom, on-demand rectangle placement, a size slider and an optional aspect-ratio lock.
 
 ## Install
 
@@ -51,16 +51,17 @@ Desktop tool for manually extracting individual characters from license plate im
 5. Resize the window, then drag again. The rectangle must still follow the cursor exactly.
 6. Click an empty area of the image. The selection should clear.
 
-## How to test zoom and on-demand rectangles
+## How to test zoom, the size slider and on-demand rectangles
 
 1. Open an image. No rectangles should appear, and the image should fit the window.
-2. Scroll the mouse wheel over the plate area (or click **Zoom +**). The image should zoom toward the cursor, keeping its aspect ratio.
+2. Scroll the mouse wheel over the plate area. The image should zoom toward the cursor, keeping its aspect ratio.
 3. Middle-drag (or use the scrollbars if visible) to pan to the part of interest.
-4. Click **Place rectangles**. All seven rectangles should appear **complete inside the currently visible area**, ready to be dragged onto the characters. The zoom level must not change.
-5. Zoom or pan elsewhere and click **Re-place rectangles**. The seven rectangles should be laid out again inside the new visible area.
-6. Click **Fit**. The image should return to fitting the window.
-7. Resize the window after zooming. The zoom level must be kept until **Fit** is used or another image is opened.
-8. Open another image. The rectangles must disappear and be reset, and **Place rectangles** must create a fresh layout for the new image.
+4. Click **Place rectangles**. Seven rectangles should appear side by side, touching each other, **complete inside the currently visible area**. The zoom level must not change.
+5. Move the **Size** slider. All seven rectangles must grow or shrink together, staying numbered 1 to 7 from left to right, touching each other, and centered in the visible area.
+6. Enter `1` in **W** and `2` in **H**, then click **Re-place rectangles** (or move the slider). Every rectangle must now be twice as tall as wide, in a touching row.
+7. Zoom or pan elsewhere and click **Re-place rectangles**. The row should be laid out again inside the new visible area.
+8. Resize the window after zooming. The zoom level must be kept until another image is opened.
+9. Open another image. The rectangles must disappear and be reset, the image must fit the window, and **Place rectangles** must create a fresh layout for the new image.
 
 ## How to test Stage 6
 
@@ -71,6 +72,7 @@ Desktop tool for manually extracting individual characters from license plate im
 5. Enter `AB 1D23` and save to a fresh folder. Only 6 files should appear, for positions 1, 2, 4, 5, 6, 7 (`A`, `B`, `1`, `D`, `2`, `3`). The blank position must not shift the others.
 6. Enter a plate containing a filename-invalid character (e.g. `A/B1D23`) and save. The output filename must use an underscore in place of the invalid character.
 7. Try saving without selecting a destination folder. An error must appear.
+8. Enter `ABC1C23` (a repeated character) and save to a fresh folder. All 7 files must appear; the two `C` crops must be named `..._3_C.png` and `..._5_C.png`.
 
 ## How to test the aspect-ratio lock
 
@@ -86,13 +88,14 @@ Desktop tool for manually extracting individual characters from license plate im
 
 - EXIF orientation is deliberately not applied, so displayed pixels match the raw pixels used for cropping in later stages.
 - Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
-- Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked, which lays all seven out inside the currently visible (possibly zoomed) area; clicking it again re-places them in the new view, discarding manual adjustments. Whether positions should carry over between images is left for a later stage.
-- Wheel zoom centers on the cursor and middle-drag pans, so the part of interest can be brought into view before placing the rectangles.
+- Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked, which lays all seven out as a touching row inside the currently visible (possibly zoomed) area; clicking it again, or moving the **Size** slider once they are placed, re-lays them in the current view, discarding manual adjustments. Whether positions should carry over between images is left for a later stage.
+- Wheel zoom centers on the cursor and middle-drag pans, so the part of interest can be brought into view before placing the rectangles. There are no zoom or fit buttons: zoom out with the wheel, or open the image again to fit it to the window.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
-- The aspect-ratio lock (**W** and **H** fields) applies only to resizing, and only when both fields hold a positive number (`.` or `,` as decimal separator). Changing the ratio does not reshape existing rectangles; a rectangle snaps to the ratio the next time it is resized. **Place rectangles** ignores the ratio.
+- The aspect-ratio lock (**W** and **H** fields) applies only when both fields hold a positive number (`.` or `,` as decimal separator). **Place rectangles** and the **Size** slider lay the rectangles out with that ratio, and resizing keeps it. Changing the fields does not reshape rectangles that are already placed; one snaps to the ratio the next time it is resized, or when the row is re-laid.
+- The **Size** slider sets the width and height of all seven rectangles together, from 10% to 100% of the largest row that fits the visible area. Without a ratio, each rectangle keeps the proportions of the visible area split into seven columns.
 - Zoom is display-only: it never changes the stored rectangle coordinates or the saved crops.
 - Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop itself is never resized or filtered.
-- Output files are always PNG, named `{source_stem}_{character}.png`. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels.
+- Output files are always PNG, named `{source_stem}_{character}.png`. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels. If two crops of one plate would get the same name (a repeated character such as the two `C`s in `ABC1C23`, characters differing only by case, or characters sanitized to the same label), each crop in that group also gets its 1-based position before the character, e.g. `{source_stem}_3_C.png` and `{source_stem}_5_C.png`, so none is overwritten. The character is always the last part of the name.
 - Existing files are never overwritten silently: saving stops and asks to overwrite all, skip all, or cancel. There is no per-file choice, and skipping some positions is done via spaces in the plate field.
 - The plate field is not cleared after a successful save. Clearing it after saving is deferred to the workflow-refinement stage.
-- Automated tests cover the non-GUI logic and the pure resize math (`crop_service`, `filename_service`, `save_service`, `aspect_ratio`, and the locked-resize function in `rect_item`); GUI behavior is checked manually with the steps above.
+- Automated tests cover the non-GUI logic and the pure resize math (`crop_service`, `filename_service`, `save_service`, `aspect_ratio`, the rectangle layout in `selection`, and the locked-resize function in `rect_item`); GUI behavior is checked manually with the steps above.

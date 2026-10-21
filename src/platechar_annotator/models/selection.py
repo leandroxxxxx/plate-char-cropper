@@ -4,14 +4,16 @@ Rectangle geometry is stored in original-image pixel coordinates, so it is
 independent of how the image is scaled for display.
 """
 
+import math
 from dataclasses import dataclass
 
 CHARACTER_COUNT = 7
 
-# Default layout, as fractions of the image size.
-_MARGIN_X_RATIO = 0.05
-_MARGIN_Y_RATIO = 0.15
-_GAP_RATIO = 0.10  # Gap between neighbours, as a fraction of the slot width.
+# Row size as a fraction of the largest row that fits the region (the UI
+# slider moves between MIN and MAX).
+MIN_SIZE_FRACTION = 0.1
+MAX_SIZE_FRACTION = 1.0
+DEFAULT_SIZE_FRACTION = 0.7
 
 
 @dataclass
@@ -30,33 +32,53 @@ class CharacterRect:
 
 
 def create_rectangles_in_region(
-    region_x: float, region_y: float, region_width: float, region_height: float
+    region_x: float,
+    region_y: float,
+    region_width: float,
+    region_height: float,
+    aspect_ratio: float | None = None,
+    size_fraction: float = DEFAULT_SIZE_FRACTION,
 ) -> list[CharacterRect]:
-    """Create the seven rectangles as an evenly spaced row inside a region.
+    """Create the seven rectangles as a row of touching rectangles in a region.
 
     The region is given in original-image pixels (for example the part of the
     image currently visible when zoomed in). Rectangles are numbered 1 to 7
-    from left to right and all lie fully inside the region.
+    from left to right, all have the same size, touch their neighbours (no gap)
+    and are centred in the region.
+
+    ``aspect_ratio`` is width / height of each rectangle. If None, each
+    rectangle gets the shape of the region split into seven equal columns.
+    ``size_fraction`` scales the row relative to the largest row that fits
+    inside the region (1.0 = as large as possible).
 
     Raises:
-        ValueError: if the region dimensions are not positive.
+        ValueError: if the region dimensions are not positive, the aspect
+            ratio is not a positive finite number, or the size fraction is
+            outside (0, 1].
     """
     if region_width <= 0 or region_height <= 0:
         raise ValueError("Region dimensions must be positive.")
+    if aspect_ratio is not None and not (
+        math.isfinite(aspect_ratio) and aspect_ratio > 0
+    ):
+        raise ValueError("Aspect ratio must be a positive number.")
+    if not 0 < size_fraction <= MAX_SIZE_FRACTION:
+        raise ValueError("Size fraction must be in (0, 1].")
 
-    margin_x = region_width * _MARGIN_X_RATIO
-    slot_width = (region_width - 2 * margin_x) / CHARACTER_COUNT
-    rect_width = slot_width * (1 - _GAP_RATIO)
-    rect_y = region_y + region_height * _MARGIN_Y_RATIO
-    rect_height = region_height * (1 - 2 * _MARGIN_Y_RATIO)
+    ratio = aspect_ratio or region_width / (CHARACTER_COUNT * region_height)
+    largest_height = min(
+        region_height, region_width / (CHARACTER_COUNT * ratio)
+    )
+    rect_height = largest_height * size_fraction
+    rect_width = rect_height * ratio
+
+    row_x = region_x + (region_width - CHARACTER_COUNT * rect_width) / 2
+    rect_y = region_y + (region_height - rect_height) / 2
 
     return [
         CharacterRect(
             index=position + 1,
-            x=region_x
-            + margin_x
-            + position * slot_width
-            + (slot_width - rect_width) / 2,
+            x=row_x + position * rect_width,
             y=rect_y,
             width=rect_width,
             height=rect_height,

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import QRegularExpression
+from PySide6.QtCore import QRegularExpression, Qt
 from PySide6.QtGui import QFontDatabase, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -10,11 +10,15 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QSlider,
     QVBoxLayout,
     QWidget,
 )
 
 from platechar_annotator.models.selection import (
+    DEFAULT_SIZE_FRACTION,
+    MAX_SIZE_FRACTION,
+    MIN_SIZE_FRACTION,
     CharacterRect,
     create_rectangles_in_region,
 )
@@ -60,14 +64,16 @@ class MainWindow(QMainWindow):
         )
         self._place_button.clicked.connect(self._on_place_rectangles)
 
-        self._zoom_out_button = QPushButton("Zoom −")
-        self._zoom_out_button.clicked.connect(self._image_view.zoom_out)
-
-        self._zoom_in_button = QPushButton("Zoom +")
-        self._zoom_in_button.clicked.connect(self._image_view.zoom_in)
-
-        self._fit_button = QPushButton("Fit")
-        self._fit_button.clicked.connect(self._image_view.fit_to_view)
+        self._size_slider = QSlider(Qt.Orientation.Horizontal)
+        self._size_slider.setRange(
+            round(MIN_SIZE_FRACTION * 100), round(MAX_SIZE_FRACTION * 100)
+        )
+        self._size_slider.setValue(round(DEFAULT_SIZE_FRACTION * 100))
+        self._size_slider.setFixedWidth(120)
+        self._size_slider.setToolTip(
+            "Size of the seven rectangles (they stay side by side)"
+        )
+        self._size_slider.valueChanged.connect(self._on_size_changed)
 
         self._save_button = QPushButton("Save characters…")
         self._save_button.clicked.connect(self._on_save)
@@ -96,9 +102,8 @@ class MainWindow(QMainWindow):
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._open_button)
         toolbar.addWidget(self._place_button)
-        toolbar.addWidget(self._zoom_out_button)
-        toolbar.addWidget(self._zoom_in_button)
-        toolbar.addWidget(self._fit_button)
+        toolbar.addWidget(QLabel("Size:"))
+        toolbar.addWidget(self._size_slider)
         toolbar.addWidget(self._save_button)
         toolbar.addWidget(self._path_label, stretch=1)
 
@@ -186,10 +191,12 @@ class MainWindow(QMainWindow):
     def _on_place_rectangles(self) -> None:
         """Place the seven rectangles inside the currently visible area.
 
-        The zoom level is left untouched, so zooming into the part of
-        interest and then clicking the button yields seven complete
-        rectangles fitted into that zoomed view, ready to be rearranged.
-        Clicking the button again re-places them in the current view.
+        The rectangles form a row of touching rectangles, sized by the size
+        slider and shaped by the W:H fields when both are filled. The zoom
+        level is left untouched, so zooming into the part of interest and
+        then clicking the button yields seven complete rectangles fitted into
+        that zoomed view, ready to be rearranged. Clicking the button again
+        re-places them in the current view.
         """
         image = self._current_image
         if image is None:
@@ -204,10 +211,27 @@ class MainWindow(QMainWindow):
             # fall back to the whole image.
             region = (0.0, 0.0, float(image.width), float(image.height))
         x, y, width, height = region
-        self._rectangles = create_rectangles_in_region(x, y, width, height)
+        self._rectangles = create_rectangles_in_region(
+            x,
+            y,
+            width,
+            height,
+            aspect_ratio=self._current_aspect_ratio(),
+            size_fraction=self._size_slider.value() / 100,
+        )
         self._image_view.set_rectangles(self._rectangles)
         self._rectangles_visible = True
         self._place_button.setText("Re-place rectangles")
+
+    def _on_size_changed(self) -> None:
+        """Re-lay the row at the new size once the rectangles are placed.
+
+        Before the first placement the slider only sets the size that
+        Place rectangles will use. Re-laying discards manual adjustments,
+        exactly like Re-place rectangles.
+        """
+        if self._rectangles_visible:
+            self._on_place_rectangles()
 
     def _on_select_folder(self) -> None:
         folder = dialogs.ask_directory(self, self._destination_folder)
@@ -218,12 +242,15 @@ class MainWindow(QMainWindow):
         self._folder_label.setText(str(folder))
         self._folder_label.setToolTip(str(folder))
 
-    def _on_aspect_ratio_changed(self) -> None:
-        """Apply the W:H fields to the rectangles' resize behaviour."""
-        ratio = parse_aspect_ratio(
+    def _current_aspect_ratio(self) -> float | None:
+        """The locked width / height from the W:H fields, or None if free."""
+        return parse_aspect_ratio(
             self._ratio_width_input.text(), self._ratio_height_input.text()
         )
-        self._image_view.set_aspect_ratio(ratio)
+
+    def _on_aspect_ratio_changed(self) -> None:
+        """Apply the W:H fields to the rectangles' resize behaviour."""
+        self._image_view.set_aspect_ratio(self._current_aspect_ratio())
 
     def _on_rectangle_changed(
         self, index: int, x: float, y: float, width: float, height: float

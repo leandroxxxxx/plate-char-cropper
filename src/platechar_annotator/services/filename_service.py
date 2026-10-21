@@ -7,6 +7,11 @@ convention::
 
 For example, source ``0001_video_00-01-23.450.png`` and character ``A``
 produce ``0001_video_00-01-23.450_A.png``.
+
+When two crops of one plate would get the same name (a repeated character),
+the caller adds the 1-based position before the character::
+
+    {source_stem}_{position}_{character}.png
 """
 
 from pathlib import Path
@@ -49,14 +54,27 @@ def sanitize_character_label(character: str) -> str:
     return sanitized
 
 
-def build_filename(stem: str, character: str) -> str:
-    """Build one output filename: ``{stem}_{character}.png``."""
+def build_filename(
+    stem: str, character: str, position: int | None = None
+) -> str:
+    """Build one output filename.
+
+    Without ``position``: ``{stem}_{character}.png``. With it (used when plain
+    names would collide): ``{stem}_{position}_{character}.png``. The character
+    label is always the last part of the name.
+    """
     label = sanitize_character_label(character)
-    return f"{stem}_{label}.png"
+    if position is None:
+        return f"{stem}_{label}.png"
+    return f"{stem}_{position}_{label}.png"
 
 
 def destination_path(
-    folder: Path | str, source_path: Path | str, character: str
+    folder: Path | str,
+    source_path: Path | str,
+    character: str,
+    position: int | None = None,
 ) -> Path:
     """Full destination path for one character crop inside ``folder``."""
-    return Path(folder) / build_filename(source_stem(source_path), character)
+    name = build_filename(source_stem(source_path), character, position)
+    return Path(folder) / name

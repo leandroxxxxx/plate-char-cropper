@@ -5,6 +5,7 @@ partially completed save behind. No GUI dependencies.
 """
 
 import os
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -100,13 +101,33 @@ def prepare_save(
 
     rects_by_index = {rect.index: rect for rect in rectangles}
 
-    planned: list[PlannedCrop] = []
+    crops: list[tuple[int, str, Image.Image]] = []
     for index, character in positions:
         rect = rects_by_index.get(index)
         if rect is None:
             raise SaveError(f"No rectangle defined for position {index}.")
         crop = crop_character(image.pixels, rect)  # CropError propagates.
-        destination = destination_path(folder, image.path, character)
+        crops.append((index, character, crop))
+
+    # Plain names are ``{stem}_{character}.png``. If two crops would get the
+    # same name (a repeated character, or different characters sanitized to
+    # the same label), every crop in that group also gets its position in the
+    # name, so none overwrites another. Names are compared case-insensitively
+    # because Windows treats ``a.png`` and ``A.png`` as the same file.
+    plain_name_counts = Counter(
+        destination_path(folder, image.path, character).name.casefold()
+        for _, character, _ in crops
+    )
+
+    planned: list[PlannedCrop] = []
+    for index, character, crop in crops:
+        plain = destination_path(folder, image.path, character)
+        collides = plain_name_counts[plain.name.casefold()] > 1
+        destination = (
+            destination_path(folder, image.path, character, position=index)
+            if collides
+            else plain
+        )
         planned.append(
             PlannedCrop(
                 index=index,
