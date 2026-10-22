@@ -3,6 +3,7 @@
     "width": 9,
     "height": 16
   },
+  "rectangle_size_fraction": 0.7,
   "group_pan_range_fraction": 0.1,
-  "zoom_step_fraction": 0.02
+  "zoom_step_fraction": 0.07
 }

@@ -17,7 +17,7 @@ Desktop tool for manually extracting individual characters from license plate im
 
 ## Local defaults
 
-Copy `.local_config.json.example` to `.local_config.json` to set defaults for this checkout. The file is ignored by Git. The default aspect ratio is 9:16; change `width` and `height` in the local file to use another ratio. `group_pan_range_fraction` sets the maximum travel from the slider center as a fraction of the image size; the default `0.1` gives each slider a ±10% range with finer movement. `zoom_step_fraction` controls wheel zoom speed per standard wheel notch; its default `0.05` changes zoom by about 5% per notch. If either setting is missing or invalid, the app uses its default.
+Copy `.local_config.json.example` to `.local_config.json` to set defaults for this checkout. The file is ignored by Git. The default aspect ratio is 9:16; change `width` and `height` in the local file to use another ratio. `rectangle_size_fraction` sets the initial Size slider value as a fraction of the largest layout that fits; `0.7` means 70%. `group_pan_range_fraction` sets the maximum travel from the slider center as a fraction of the image size; the default `0.1` gives each pan slider a ±10% range. `zoom_step_fraction` controls wheel zoom speed per standard wheel notch; the example uses `0.02` for about 2% per notch, while the fallback is `0.05`. Missing or invalid settings use their defaults.
 
 ## Run the tests
 

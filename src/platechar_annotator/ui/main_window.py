@@ -32,6 +32,7 @@ from platechar_annotator.services.image_service import (
 )
 from platechar_annotator.services.local_config import (
     load_default_aspect_ratio,
+    load_default_rectangle_size_fraction,
     load_group_pan_range_fraction,
 )
 from platechar_annotator.services.save_service import (
@@ -85,7 +86,7 @@ class MainWindow(QMainWindow):
         self._size_slider.setRange(
             round(MIN_SIZE_FRACTION * 100), round(MAX_SIZE_FRACTION * 100)
         )
-        self._size_slider.setValue(round(DEFAULT_SIZE_FRACTION * 100))
+        self._size_slider.setValue(round(load_default_rectangle_size_fraction() * 100))
         self._size_slider.setToolTip(
             "Size of the seven rectangles (they stay side by side)"
         )

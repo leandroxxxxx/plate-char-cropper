@@ -4,6 +4,8 @@ import json
 import math
 from pathlib import Path
 
+from platechar_annotator.models.selection import DEFAULT_SIZE_FRACTION
+
 _CONFIG_PATH = Path(__file__).resolve().parents[3] / ".local_config.json"
 
 
@@ -42,3 +44,15 @@ def load_zoom_step_fraction() -> float:
     except (OSError, ValueError, TypeError, KeyError):
         pass
     return 0.05
+
+
+def load_default_rectangle_size_fraction() -> float:
+    """Read initial rectangle size as a fraction of the available maximum."""
+    try:
+        config = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        value = float(config["rectangle_size_fraction"])
+        if math.isfinite(value) and 0.1 <= value <= 1:
+            return value
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return DEFAULT_SIZE_FRACTION
