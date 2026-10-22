@@ -2,7 +2,7 @@
 
 Desktop tool for manually extracting individual characters from license plate images.
 
-**Current status:** Stage 6 (saving) with zoom, on-demand rectangle placement, a size slider and an optional aspect-ratio lock.
+**Current status:** Stage 6 (saving) with same-folder image navigation, zoom, on-demand rectangle placement, group movement, a size slider and an optional aspect-ratio lock.
 
 ## Install
 
@@ -31,6 +31,7 @@ Copy `.local_config.json.example` to `.local_config.json` to set defaults for th
 3. Resize the window. The image should rescale and keep its aspect ratio.
 4. Open a second image. It should replace the first without restarting.
 5. Open a non-image file (choose "All files" in the dialog). An error message should appear and the previous image should remain.
+6. Open an image in a folder with several PNG, JPEG or WebP images. **Previous image** and **Next image** should navigate in ascending natural filename order (`A0` before `A1`, `image2` before `image10`); each button is disabled at the first or last image.
 
 ## How to test Stage 2
 
@@ -95,6 +96,7 @@ Copy `.local_config.json.example` to `.local_config.json` to set defaults for th
 - Images with unusual modes (e.g. 16-bit grayscale) are converted to 8-bit RGBA for display only; the original is kept as decoded.
 - Rectangle geometry is stored in original-image pixels and is reset every time an image is opened. Rectangles are hidden until **Place rectangles** is clicked, which lays all seven out as a touching row inside the currently visible (possibly zoomed) area; clicking it again, or moving the **Size** slider once they are placed, re-lays them in the current view, discarding manual adjustments. Whether positions should carry over between images is left for a later stage.
 - Wheel zoom centers on the cursor and middle-drag pans, so the part of interest can be brought into view before placing the rectangles. There are no zoom or fit buttons: zoom out with the wheel, or open the image again to fit it to the window.
+- **Previous image** and **Next image** move through PNG, JPEG and WebP files in the current image's folder in natural filename order. Navigating resets rectangles and fits the new image to the view while keeping the plate field and destination folder.
 - Rectangles are kept inside the image and cannot be smaller than 2×2 pixels. They are edited with the mouse only (no keyboard nudging yet).
 - The aspect-ratio lock (**W** and **H** fields) applies only when both fields hold a positive number (`.` or `,` as decimal separator). **Place rectangles** and the **Size** slider lay the rectangles out with that ratio, and resizing keeps it. Changing the fields does not reshape rectangles that are already placed; one snaps to the ratio the next time it is resized, or when the row is re-laid.
 - The **Size** slider sets the width and height of all seven rectangles together, from 10% to 100% of the largest row that fits the visible area. Without a ratio, each rectangle keeps the proportions of the visible area split into seven columns.

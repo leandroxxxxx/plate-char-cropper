@@ -1,5 +1,6 @@
 """Main application window."""
 
+import re
 from pathlib import Path
 
 from PySide6.QtCore import QRegularExpression, Qt
@@ -53,6 +54,8 @@ class MainWindow(QMainWindow):
         self._current_image: LoadedImage | None = None
         self._last_directory: Path | None = None
         self._destination_folder: Path | None = None
+        self._image_paths: list[Path] = []
+        self._image_index: int | None = None
         self._rectangles: list[CharacterRect] = []
         self._rectangles_visible = False
 
@@ -61,6 +64,13 @@ class MainWindow(QMainWindow):
 
         self._open_button = QPushButton("Open image…")
         self._open_button.clicked.connect(self._on_open_image)
+
+        self._previous_image_button = QPushButton("Previous image")
+        self._previous_image_button.setEnabled(False)
+        self._previous_image_button.clicked.connect(lambda: self._navigate_image(-1))
+        self._next_image_button = QPushButton("Next image")
+        self._next_image_button.setEnabled(False)
+        self._next_image_button.clicked.connect(lambda: self._navigate_image(1))
 
         self._place_button = QPushButton("Place rectangles")
         self._place_button.setToolTip(
@@ -119,6 +129,8 @@ class MainWindow(QMainWindow):
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._open_button)
+        toolbar.addWidget(self._previous_image_button)
+        toolbar.addWidget(self._next_image_button)
         toolbar.addWidget(self._place_button)
         toolbar.addWidget(QLabel("Size:"))
         toolbar.addWidget(self._size_slider)
@@ -206,6 +218,11 @@ class MainWindow(QMainWindow):
         if path is None:
             return  # User cancelled.
 
+        self._load_and_show_image(path)
+
+    def _load_and_show_image(self, path: Path) -> None:
+        """Load an image and refresh the current-folder navigation state."""
+
         try:
             loaded = load_image(path)
         except ImageLoadError as exc:
@@ -215,6 +232,12 @@ class MainWindow(QMainWindow):
 
         self._current_image = loaded
         self._last_directory = path.parent
+        self._image_paths = self._images_in_folder(path.parent)
+        if path not in self._image_paths:
+            self._image_paths.append(path)
+            self._image_paths.sort(key=self._image_sort_key)
+        self._image_index = self._image_paths.index(path)
+        self._update_image_navigation()
         # Rectangles are hidden and reset every time a new image is opened.
         self._rectangles = []
         self._rectangles_visible = False
@@ -223,6 +246,41 @@ class MainWindow(QMainWindow):
         self._image_view.set_image(loaded.pixels)  # Drops any rectangle overlays.
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
         self._status_label.setText("")
+
+    @staticmethod
+    def _image_sort_key(path: Path) -> tuple[tuple[int, str | int], ...]:
+        """Return an ascending natural key (A0 before A1, image2 before image10)."""
+        parts = re.split(r"(\d+)", path.name.casefold())
+        return tuple(
+            (1, int(part)) if part.isdigit() else (0, part) for part in parts
+        )
+
+    @classmethod
+    def _images_in_folder(cls, folder: Path) -> list[Path]:
+        supported = {".png", ".jpg", ".jpeg", ".webp"}
+        try:
+            images = [
+                path
+                for path in folder.iterdir()
+                if path.is_file() and path.suffix.casefold() in supported
+            ]
+        except OSError:
+            return []
+        return sorted(images, key=cls._image_sort_key, reverse=False)
+
+    def _navigate_image(self, offset: int) -> None:
+        if self._image_index is None:
+            return
+        target_index = self._image_index + offset
+        if 0 <= target_index < len(self._image_paths):
+            self._load_and_show_image(self._image_paths[target_index])
+
+    def _update_image_navigation(self) -> None:
+        index = self._image_index
+        self._previous_image_button.setEnabled(index is not None and index > 0)
+        self._next_image_button.setEnabled(
+            index is not None and index < len(self._image_paths) - 1
+        )
 
     def _on_place_rectangles(self) -> None:
         """Place the seven rectangles inside the currently visible area.
