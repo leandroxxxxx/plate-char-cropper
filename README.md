@@ -74,11 +74,12 @@ Copy `.local_config.json.example` to `.local_config.json` to set defaults for th
 1. Open an image, enter `ABC1D23` in the **Plate** field, and select a destination folder.
 2. Click **Save characters…**. The status bar should report that 7 crops were saved. Each output filename starts with its own sortable local timestamp in `YYMMDDHHMMSS_microseconds` format, followed by the source name and character label.
 3. Save again. Each crop gets a fresh timestamp, so filenames remain separate.
-4. Clear the plate field and save. An error must appear and no files may change.
-5. Enter `AB 1D23` and save to a fresh folder. Only 6 files should appear, for positions 1, 2, 4, 5, 6, 7 (`A`, `B`, `1`, `D`, `2`, `3`). The blank position must not shift the others.
-6. Enter a plate containing a filename-invalid character (e.g. `A/B1D23`) and save. The output filename must use an underscore in place of the invalid character.
-7. Try saving without selecting a destination folder. An error must appear.
-8. Enter `ABC1C23` (a repeated character) and save to a fresh folder. All 7 files must appear; the two `C` crops must retain position markers `_3_C` and `_5_C`.
+4. Navigate away and back to the image. A blue **Already processed** label should appear after all planned crops exist. Close and restart the app; the temporary marker should be cleared.
+5. Clear the plate field and save. An error must appear and no files may change.
+6. Enter `AB 1D23` and save to a fresh folder. Only 6 files should appear, for positions 1, 2, 4, 5, 6, 7 (`A`, `B`, `1`, `D`, `2`, `3`). The blank position must not shift the others.
+7. Enter a plate containing a filename-invalid character (e.g. `A/B1D23`) and save. The output filename must use an underscore in place of the invalid character.
+8. Try saving without selecting a destination folder. An error must appear.
+9. Enter `ABC1C23` (a repeated character) and save to a fresh folder. All 7 files must appear; the two `C` crops must retain position markers `_3_C` and `_5_C`.
 
 ## How to test the aspect-ratio lock
 
@@ -105,5 +106,6 @@ Copy `.local_config.json.example` to `.local_config.json` to set defaults for th
 - Crops cover whole pixels: each rectangle edge is rounded to the nearest pixel (halves round up) and clamped to the image. The crop itself is never resized or filtered.
 - Output files are always PNG, named `{YYMMDDHHMMSS_microseconds}_{source_stem}_{character}.png`. Each crop gets its own increasing local timestamp, so filename prefixes sort in crop creation order without sequence numbers. A 1-based position is added only when labels repeat or sanitize to the same text within a batch. Filename-invalid characters (such as `/`, `?`, `*`) become underscores; letters and digits keep their labels.
 - Existing files are never overwritten silently: saving stops and asks to overwrite all, skip all, or cancel. There is no per-file choice, and skipping some positions is done via spaces in the plate field.
+- Images are marked processed in temporary memory for the current app session once all planned crop files exist. A blue **Already processed** label appears when the image is loaded again; restarting the app clears these markers.
 - The plate field is not cleared after a successful save. Clearing it after saving is deferred to the workflow-refinement stage.
 - Automated tests cover the non-GUI logic and the pure resize math (`crop_service`, `filename_service`, `save_service`, `aspect_ratio`, the rectangle layout in `selection`, and the locked-resize function in `rect_item`); GUI behavior is checked manually with the steps above.

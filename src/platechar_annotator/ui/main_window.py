@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         self._destination_folder: Path | None = None
         self._image_paths: list[Path] = []
         self._image_index: int | None = None
+        self._processed_images: set[Path] = set()
         self._rectangles: list[CharacterRect] = []
         self._rectangles_visible = False
         self._size_anchor_rectangles: list[CharacterRect] = []
@@ -106,6 +107,8 @@ class MainWindow(QMainWindow):
         self._save_button.clicked.connect(self._on_save)
 
         self._path_label = QLabel("No image loaded.")
+        self._processed_label = QLabel("")
+        self._processed_label.setStyleSheet("color: blue; font-weight: bold;")
         self._status_label = QLabel("")
 
         self._plate_input = QLineEdit()
@@ -138,6 +141,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self._size_slider)
         toolbar.addWidget(self._save_button)
         toolbar.addWidget(self._path_label, stretch=1)
+        toolbar.addWidget(self._processed_label)
 
         plate_row = QHBoxLayout()
         plate_row.addWidget(QLabel("Plate:"))
@@ -249,7 +253,14 @@ class MainWindow(QMainWindow):
         self._place_button.setText("Place rectangles")
         self._image_view.set_image(loaded.pixels)  # Drops any rectangle overlays.
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
+        self._update_processed_indicator()
         self._status_label.setText("")
+
+    def _update_processed_indicator(self) -> None:
+        """Show a blue marker when the current image was processed this session."""
+        image = self._current_image
+        is_processed = image is not None and image.path.resolve() in self._processed_images
+        self._processed_label.setText("Already processed" if is_processed else "")
 
     @staticmethod
     def _image_sort_key(path: Path) -> tuple[tuple[int, str | int], ...]:
@@ -485,6 +496,10 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             dialogs.show_error(self, "Save failed", f"Could not write the files: {exc}")
             return
+
+        if planned and all(crop.destination.exists() for crop in planned):
+            self._processed_images.add(self._current_image.path.resolve())
+            self._update_processed_indicator()
 
         if saved:
             self._status_label.setText(
