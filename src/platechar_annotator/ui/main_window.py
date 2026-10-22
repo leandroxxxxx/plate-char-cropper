@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
         self._ratio_height_input.setText(f"{default_height:g}")
         self._ratio_width_input.textChanged.connect(self._on_aspect_ratio_changed)
         self._ratio_height_input.textChanged.connect(self._on_aspect_ratio_changed)
+        self._on_aspect_ratio_changed()
 
         self._folder_button = QPushButton("Select destination folder…")
         self._folder_button.clicked.connect(self._on_select_folder)
