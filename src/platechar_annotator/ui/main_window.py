@@ -86,7 +86,6 @@ class MainWindow(QMainWindow):
             round(MIN_SIZE_FRACTION * 100), round(MAX_SIZE_FRACTION * 100)
         )
         self._size_slider.setValue(round(DEFAULT_SIZE_FRACTION * 100))
-        self._size_slider.setFixedWidth(120)
         self._size_slider.setToolTip(
             "Size of the seven rectangles (they stay side by side)"
         )
@@ -137,11 +136,24 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self._previous_image_button)
         toolbar.addWidget(self._next_image_button)
         toolbar.addWidget(self._place_button)
-        toolbar.addWidget(QLabel("Size:"))
-        toolbar.addWidget(self._size_slider)
         toolbar.addWidget(self._save_button)
         toolbar.addWidget(self._path_label, stretch=1)
         toolbar.addWidget(self._processed_label)
+
+        adjustment_row = QHBoxLayout()
+        adjustment_row.addWidget(QLabel("Zoom (wheel):"))
+        size_label = QLabel("Size:")
+        size_label.setFixedWidth(48)
+        pan_h_label = QLabel("Pan H:")
+        pan_h_label.setFixedWidth(48)
+        pan_v_label = QLabel("Pan V:")
+        pan_v_label.setFixedWidth(48)
+        adjustment_row.addWidget(size_label)
+        adjustment_row.addWidget(self._size_slider, stretch=1)
+        adjustment_row.addWidget(pan_h_label)
+        adjustment_row.addWidget(self._pan_horizontal_slider, stretch=1)
+        adjustment_row.addWidget(pan_v_label)
+        adjustment_row.addWidget(self._pan_vertical_slider, stretch=1)
 
         plate_row = QHBoxLayout()
         plate_row.addWidget(QLabel("Plate:"))
@@ -150,12 +162,6 @@ class MainWindow(QMainWindow):
         plate_row.addWidget(self._ratio_width_input)
         plate_row.addWidget(QLabel(":"))
         plate_row.addWidget(self._ratio_height_input)
-
-        pan_row = QHBoxLayout()
-        pan_row.addWidget(QLabel("Move all horizontally:"))
-        pan_row.addWidget(self._pan_horizontal_slider, stretch=1)
-        pan_row.addWidget(QLabel("Move all vertically:"))
-        pan_row.addWidget(self._pan_vertical_slider, stretch=1)
 
         folder_row = QHBoxLayout()
         folder_row.addWidget(self._folder_button)
@@ -166,8 +172,8 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout()
         layout.addLayout(toolbar)
+        layout.addLayout(adjustment_row)
         layout.addLayout(plate_row)
-        layout.addLayout(pan_row)
         layout.addLayout(folder_row)
         layout.addLayout(status_row)
         layout.addWidget(self._image_view, stretch=1)
