@@ -14,6 +14,7 @@ from PySide6.QtGui import (
     QBrush,
     QColor,
     QImage,
+    QKeyEvent,
     QMouseEvent,
     QPainter,
     QPixmap,
@@ -64,11 +65,15 @@ class ImageView(QGraphicsView):
     # Emitted while a rectangle is moved or resized, with its new geometry:
     # (index, x, y, width, height) in original-image pixel coordinates.
     rectangle_changed = Signal(int, float, float, float, float)
+    rectangle_deleted = Signal(int)
+    selection_changed = Signal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._scene = QGraphicsScene(self)
+        self._scene.selectionChanged.connect(self._emit_selection_changed)
         self.setScene(self._scene)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._rect_items: list[RectOverlayItem] = []
         self._manual_zoom = False  # True once the user zooms, until fit/reset.
@@ -84,8 +89,8 @@ class ImageView(QGraphicsView):
 
     def set_image(self, image: Image.Image) -> None:
         """Replace the displayed image, dropping any rectangle overlays."""
+        self._rect_items = []
         self._scene.clear()
-        self._rect_items = []  # clear() already deleted the overlay items.
         self._pixmap_item = self._scene.addPixmap(pil_to_qpixmap(image))
         self._scene.setSceneRect(self._pixmap_item.boundingRect())
         self.fit_to_view()
@@ -100,9 +105,35 @@ class ImageView(QGraphicsView):
         if self._pixmap_item is None:
             return  # No image loaded: nothing to overlay.
 
-        for item in self._rect_items:
+        old_items = self._rect_items
+        self._rect_items = []
+        for item in old_items:
             self._scene.removeItem(item)
         self._rect_items = [self._add_rect_overlay(rect) for rect in rectangles]
+
+    def delete_selected_rectangle(self) -> bool:
+        """Remove the selected character rectangle, if there is one."""
+        selected = next(
+            (item for item in self._rect_items if item.isSelected()), None
+        )
+        if selected is None:
+            return False
+        index = selected.character_index
+        self._rect_items.remove(selected)
+        self._scene.removeItem(selected)
+        self.rectangle_deleted.emit(index)
+        return True
+
+    def _emit_selection_changed(self) -> None:
+        selected_index = next(
+            (
+                item.character_index
+                for item in self._rect_items
+                if item.isSelected()
+            ),
+            -1,
+        )
+        self.selection_changed.emit(selected_index)
 
     def set_aspect_ratio(self, ratio: float | None) -> None:
         """Lock rectangle resizing to width/height == ratio (None = free).
@@ -185,6 +216,13 @@ class ImageView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         event.accept()
 
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 (Qt API)
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            if self.delete_selected_rectangle():
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt API)
         """Middle button starts panning; other buttons behave as usual."""
         if event.button() == Qt.MouseButton.MiddleButton:
@@ -192,6 +230,7 @@ class ImageView(QGraphicsView):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt API)

@@ -108,9 +108,14 @@ def prepare_save(
     for index, character in positions:
         rect = rects_by_index.get(index)
         if rect is None:
-            raise SaveError(f"No rectangle defined for position {index}.")
+            continue  # A deleted rectangle leaves that character position empty.
         crop = crop_character(image.pixels, rect)  # CropError propagates.
         crops.append((index, character, crop))
+
+    if not crops:
+        raise SaveError(
+            "Nothing to save: no character positions have a rectangle."
+        )
 
     # Position is added only when repeated or sanitized labels collide. Give
     # every crop its own increasing local timestamp so the prefixes sort too.

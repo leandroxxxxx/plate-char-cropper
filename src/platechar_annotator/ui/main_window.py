@@ -65,6 +65,8 @@ class MainWindow(QMainWindow):
 
         self._image_view = ImageView()
         self._image_view.rectangle_changed.connect(self._on_rectangle_changed)
+        self._image_view.rectangle_deleted.connect(self._on_rectangle_deleted)
+        self._image_view.selection_changed.connect(self._on_rectangle_selection_changed)
 
         self._open_button = QPushButton("Open image…")
         self._open_button.clicked.connect(self._on_open_image)
@@ -81,6 +83,14 @@ class MainWindow(QMainWindow):
             "Place the seven character rectangles inside the currently visible area"
         )
         self._place_button.clicked.connect(self._on_place_rectangles)
+        self._delete_rectangle_button = QPushButton("Delete selected")
+        self._delete_rectangle_button.setEnabled(False)
+        self._delete_rectangle_button.setToolTip(
+            "Delete the selected rectangle. You can also press Delete or Backspace."
+        )
+        self._delete_rectangle_button.clicked.connect(
+            self._image_view.delete_selected_rectangle
+        )
 
         self._size_slider = QSlider(Qt.Orientation.Horizontal)
         self._size_slider.setRange(
@@ -138,6 +148,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self._previous_image_button)
         toolbar.addWidget(self._next_image_button)
         toolbar.addWidget(self._place_button)
+        toolbar.addWidget(self._delete_rectangle_button)
         toolbar.addWidget(self._save_button)
         toolbar.addWidget(self._path_label, stretch=1)
         toolbar.addWidget(self._processed_label)
@@ -469,6 +480,19 @@ class MainWindow(QMainWindow):
                 rect.x, rect.y, rect.width, rect.height = x, y, width, height
                 self._capture_size_anchor()
                 break
+
+    def _on_rectangle_deleted(self, index: int) -> None:
+        """Remove the rectangle without changing later character positions."""
+        self._rectangles = [
+            rect for rect in self._rectangles if rect.index != index
+        ]
+        if self._rectangles:
+            self._capture_size_anchor()
+        else:
+            self._size_anchor_rectangles = []
+
+    def _on_rectangle_selection_changed(self, index: int) -> None:
+        self._delete_rectangle_button.setEnabled(index >= 0)
 
     def _on_save(self) -> None:
         """Validate everything, then save the non-empty character crops."""
