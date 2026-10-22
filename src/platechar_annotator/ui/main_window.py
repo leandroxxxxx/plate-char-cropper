@@ -58,6 +58,8 @@ class MainWindow(QMainWindow):
         self._image_index: int | None = None
         self._rectangles: list[CharacterRect] = []
         self._rectangles_visible = False
+        self._size_anchor_rectangles: list[CharacterRect] = []
+        self._size_anchor_value = round(DEFAULT_SIZE_FRACTION * 100)
 
         self._image_view = ImageView()
         self._image_view.rectangle_changed.connect(self._on_rectangle_changed)
@@ -241,6 +243,8 @@ class MainWindow(QMainWindow):
         # Rectangles are hidden and reset every time a new image is opened.
         self._rectangles = []
         self._rectangles_visible = False
+        self._size_anchor_rectangles = []
+        self._size_anchor_value = self._size_slider.value()
         self._reset_pan_sliders()
         self._place_button.setText("Place rectangles")
         self._image_view.set_image(loaded.pixels)  # Drops any rectangle overlays.
@@ -316,17 +320,65 @@ class MainWindow(QMainWindow):
         self._reset_pan_sliders()
         self._image_view.set_rectangles(self._rectangles)
         self._rectangles_visible = True
+        self._capture_size_anchor()
         self._place_button.setText("Re-place rectangles")
 
     def _on_size_changed(self) -> None:
-        """Re-lay the row at the new size once the rectangles are placed.
+        """Scale the group around rectangle 1's upper-left corner."""
+        if not self._rectangles_visible or not self._size_anchor_rectangles:
+            return
 
-        Before the first placement the slider only sets the size that
-        Place rectangles will use. Re-laying discards manual adjustments,
-        exactly like Re-place rectangles.
-        """
-        if self._rectangles_visible:
-            self._on_place_rectangles()
+        image = self._current_image
+        if image is None or self._size_anchor_value <= 0:
+            return
+
+        requested_scale = self._size_slider.value() / self._size_anchor_value
+        anchor = next(
+            (rect for rect in self._size_anchor_rectangles if rect.index == 1),
+            self._size_anchor_rectangles[0],
+        )
+        max_scale = float("inf")
+        min_scale = 0.0
+        for rect in self._size_anchor_rectangles:
+            min_scale = max(min_scale, 2 / rect.width, 2 / rect.height)
+            for coordinate, fixed, bound in (
+                (rect.x, anchor.x, image.width),
+                (rect.x + rect.width, anchor.x, image.width),
+                (rect.y, anchor.y, image.height),
+                (rect.y + rect.height, anchor.y, image.height),
+            ):
+                offset = coordinate - fixed
+                if offset < 0:
+                    max_scale = min(max_scale, fixed / -offset)
+                elif offset > 0:
+                    max_scale = min(max_scale, (bound - fixed) / offset)
+
+        scale = (
+            min(max(requested_scale, min_scale), max_scale)
+            if min_scale <= max_scale
+            else max_scale
+        )
+        for index, rect in enumerate(self._size_anchor_rectangles):
+            self._rectangles[index].x = anchor.x + (rect.x - anchor.x) * scale
+            self._rectangles[index].y = anchor.y + (rect.y - anchor.y) * scale
+            self._rectangles[index].width = rect.width * scale
+            self._rectangles[index].height = rect.height * scale
+
+        effective_value = round(self._size_anchor_value * scale)
+        if effective_value != self._size_slider.value():
+            self._size_slider.blockSignals(True)
+            self._size_slider.setValue(effective_value)
+            self._size_slider.blockSignals(False)
+        self._image_view.set_rectangles(self._rectangles)
+        self._capture_size_anchor()
+
+    def _capture_size_anchor(self) -> None:
+        """Save current geometry as the basis for the next size adjustment."""
+        self._size_anchor_rectangles = [
+            CharacterRect(rect.index, rect.x, rect.y, rect.width, rect.height)
+            for rect in self._rectangles
+        ]
+        self._size_anchor_value = self._size_slider.value()
 
     def _reset_pan_sliders(self) -> None:
         self._pan_horizontal_slider.blockSignals(True)
@@ -368,6 +420,7 @@ class MainWindow(QMainWindow):
             slider.blockSignals(False)
         self._pan_last_values[axis] = effective_value
         self._image_view.set_rectangles(self._rectangles)
+        self._capture_size_anchor()
 
     def _on_select_folder(self) -> None:
         folder = dialogs.ask_directory(self, self._destination_folder)
@@ -395,6 +448,7 @@ class MainWindow(QMainWindow):
         for rect in self._rectangles:
             if rect.index == index:
                 rect.x, rect.y, rect.width, rect.height = x, y, width, height
+                self._capture_size_anchor()
                 break
 
     def _on_save(self) -> None:
