@@ -75,10 +75,10 @@ For example, with `ABCDEFG` entered, deleting rectangle 3 skips `C`. Deleting re
 Each crop is saved as a PNG in the selected destination folder. Its filename follows this pattern:
 
 ```text
-{YYMMDDHHMMSS_microseconds}_{source_stem}[_{position}]_{character}.png
+{YYMMDDHHMMSS_microseconds}_{source_stem}_{full_plate}_{position}_{character}.png
 ```
 
-The timestamp is placed first and is made unique within the save batch, so filenames sort in crop creation order. The optional 1-based position is added when character labels would otherwise produce colliding names, such as repeated characters. Characters that are invalid in common filenames are replaced with underscores.
+The timestamp is placed first and is made unique within the save batch, so filenames sort in crop creation order. Every filename includes the complete text from the **Plate** field, the crop's 1-based position, and the character label. Spaces in the plate text represent blank positions and appear as underscores in filenames. Characters that are invalid in common filenames are also replaced with underscores.
 
 Existing files are never overwritten without a prompt. **Overwrite All** replaces the planned files that already exist; **Skip All** keeps them and continues with other planned crops; **Cancel** stops the save. The **Already processed** indicator is kept in temporary memory for the current app session and is cleared when the application closes.
 

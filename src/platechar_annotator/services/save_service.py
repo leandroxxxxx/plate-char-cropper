@@ -5,7 +5,6 @@ partially completed save behind. No GUI dependencies.
 """
 
 import os
-from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -117,13 +116,8 @@ def prepare_save(
             "Nothing to save: no character positions have a rectangle."
         )
 
-    # Position is added only when repeated or sanitized labels collide. Give
-    # every crop its own increasing local timestamp so the prefixes sort too.
-    plain_names = [
-        destination_path(folder, image.path, character, timestamp="").name.casefold()
-        for _, character, _ in crops
-    ]
-    name_counts = Counter(plain_names)
+    # Include the complete plate and position in every name. Give every crop
+    # its own increasing local timestamp so the prefixes sort in save order.
     planned: list[PlannedCrop] = []
     last_timestamp: datetime | None = None
     for index, character, crop in crops:
@@ -135,13 +129,13 @@ def prepare_save(
             last_timestamp = current_timestamp
         else:
             crop_timestamp = timestamp
-        plain = destination_path(folder, image.path, character, timestamp="")
         destination = destination_path(
             folder,
             image.path,
             character,
             timestamp=crop_timestamp,
-            position=index if name_counts[plain.name.casefold()] > 1 else None,
+            position=index,
+            plate_text=plate_text,
         )
         planned.append(
             PlannedCrop(
