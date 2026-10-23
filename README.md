@@ -6,7 +6,7 @@ PlateChar Annotator is a desktop application for extracting the seven characters
 
 - Open PNG, JPEG, and WebP images.
 - Move through supported images in the current folder using **Previous image** and **Next image**. Files are ordered naturally, so `image2` comes before `image10`.
-- Zoom with the mouse wheel and pan with the middle mouse button or scrollbars.
+- Zoom with the mouse wheel using bicubic image resampling, and pan with the middle mouse button or scrollbars.
 - Place seven numbered rectangles over the currently visible part of the image. Drag a rectangle to move it, or drag its edges and handles to resize it.
 - Lock rectangle proportions with the **W:H** fields. Leave either field empty to resize freely.
 - Adjust the row size and move all rectangles together with the **Size**, **Pan H**, and **Pan V** sliders.

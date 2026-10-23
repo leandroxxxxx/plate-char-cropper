@@ -19,6 +19,7 @@ from PySide6.QtGui import (
     QPainter,
     QPixmap,
     QResizeEvent,
+    QTransform,
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
@@ -46,6 +47,7 @@ _RECT_COLOR_HEX = [
 
 _ZOOM_MIN = 0.05
 _ZOOM_MAX = 64.0
+_MAX_BICUBIC_PIXELS = 16_000_000
 
 
 def pil_to_qpixmap(image: Image.Image) -> QPixmap:
@@ -75,6 +77,7 @@ class ImageView(QGraphicsView):
         self.setScene(self._scene)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._pixmap_item: QGraphicsPixmapItem | None = None
+        self._display_image: Image.Image | None = None
         self._rect_items: list[RectOverlayItem] = []
         self._manual_zoom = False  # True once the user zooms, until fit/reset.
         self._pan_last_pos: QPoint | None = None  # Set while middle-dragging.
@@ -91,9 +94,47 @@ class ImageView(QGraphicsView):
         """Replace the displayed image, dropping any rectangle overlays."""
         self._rect_items = []
         self._scene.clear()
-        self._pixmap_item = self._scene.addPixmap(pil_to_qpixmap(image))
-        self._scene.setSceneRect(self._pixmap_item.boundingRect())
+        self._display_image = image.convert("RGBA")
+        self._pixmap_item = self._scene.addPixmap(pil_to_qpixmap(self._display_image))
+        self._scene.setSceneRect(self._pixmap_item.sceneBoundingRect())
         self.fit_to_view()
+
+    def _update_bicubic_pixmap(self) -> None:
+        """Resample the display image at the current view scale with bicubic filtering.
+
+        The pixmap is drawn with an inverse item transform, preserving the
+        original image's scene bounds so overlays and crop coordinates remain
+        aligned. A pixel cap limits memory use at very high zoom levels; Qt's
+        smooth transform handles any remaining scale beyond that cap.
+        """
+        if self._display_image is None or self._pixmap_item is None:
+            return
+
+        view_scale = max(self.transform().m11(), 1e-6)
+        source_width, source_height = self._display_image.size
+        requested_pixels = source_width * source_height * view_scale * view_scale
+        render_scale = view_scale
+        if requested_pixels > _MAX_BICUBIC_PIXELS:
+            render_scale *= (_MAX_BICUBIC_PIXELS / requested_pixels) ** 0.5
+
+        target_size = (
+            max(1, round(source_width * render_scale)),
+            max(1, round(source_height * render_scale)),
+        )
+        if render_scale == 1.0:
+            rendered = self._display_image
+        else:
+            rendered = self._display_image.resize(
+                target_size, Image.Resampling.BICUBIC
+            )
+
+        self._pixmap_item.setPixmap(pil_to_qpixmap(rendered))
+        inverse_x = source_width / target_size[0]
+        inverse_y = source_height / target_size[1]
+        self._pixmap_item.setTransform(QTransform.fromScale(inverse_x, inverse_y))
+        self._pixmap_item.setTransformationMode(
+            Qt.TransformationMode.SmoothTransformation
+        )
 
     def set_rectangles(self, rectangles: Sequence[CharacterRect]) -> None:
         """Draw one overlay per rectangle, replacing any previous overlays.
@@ -170,6 +211,7 @@ class ImageView(QGraphicsView):
         self._manual_zoom = False
         if self._pixmap_item is not None:
             self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+            self._update_bicubic_pixmap()
 
     def zoom_in(self) -> None:
         """Zoom in one step around the viewport center."""
@@ -187,6 +229,7 @@ class ImageView(QGraphicsView):
         current = self.transform().m11()
         target = max(_ZOOM_MIN, min(current * factor, _ZOOM_MAX))
         self.scale(target / current, target / current)
+        self._update_bicubic_pixmap()
 
     def visible_image_rect(self) -> tuple[float, float, float, float] | None:
         """The part of the image currently visible, in original-image pixels.
