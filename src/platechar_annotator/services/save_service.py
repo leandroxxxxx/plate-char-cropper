@@ -69,6 +69,8 @@ def prepare_save(
     destination_folder: Path | str | None,
     *,
     timestamp: str | None = None,
+    environment_flag: str = "l",
+    brightness_flag: str = "n",
 ) -> list[PlannedCrop]:
     """Validate everything and build the save plan without writing files.
 
@@ -136,6 +138,8 @@ def prepare_save(
             timestamp=crop_timestamp,
             position=index,
             plate_text=plate_text,
+            environment_flag=environment_flag,
+            brightness_flag=brightness_flag,
         )
         planned.append(
             PlannedCrop(

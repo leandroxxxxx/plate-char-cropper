@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import QRegularExpression, Qt
 from PySide6.QtGui import QFontDatabase, QRegularExpressionValidator
 from PySide6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -138,6 +139,19 @@ class MainWindow(QMainWindow):
         self._ratio_height_input.textChanged.connect(self._on_aspect_ratio_changed)
         self._on_aspect_ratio_changed()
 
+        self._environment_combo = QComboBox()
+        self._environment_combo.addItem("Light (l)", "l")
+        self._environment_combo.addItem("Dark (d)", "d")
+        self._environment_combo.setToolTip(
+            "Choose whether the scene was captured in light or dark conditions."
+        )
+        self._brightness_combo = QComboBox()
+        self._brightness_combo.addItem("Normal (n)", "n")
+        self._brightness_combo.addItem("Bright (b)", "b")
+        self._brightness_combo.setToolTip(
+            "Choose Bright when strong light is falling on the plate."
+        )
+
         self._folder_button = QPushButton("Select destination folder…")
         self._folder_button.clicked.connect(self._on_select_folder)
 
@@ -176,6 +190,13 @@ class MainWindow(QMainWindow):
         plate_row.addWidget(QLabel(":"))
         plate_row.addWidget(self._ratio_height_input)
 
+        conditions_row = QHBoxLayout()
+        conditions_row.addWidget(QLabel("Environment:"))
+        conditions_row.addWidget(self._environment_combo)
+        conditions_row.addWidget(QLabel("Plate brightness:"))
+        conditions_row.addWidget(self._brightness_combo)
+        conditions_row.addStretch(1)
+
         folder_row = QHBoxLayout()
         folder_row.addWidget(self._folder_button)
         folder_row.addWidget(self._folder_label, stretch=1)
@@ -187,6 +208,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(toolbar)
         layout.addLayout(adjustment_row)
         layout.addLayout(plate_row)
+        layout.addLayout(conditions_row)
         layout.addLayout(folder_row)
         layout.addLayout(status_row)
         layout.addWidget(self._image_view, stretch=1)
@@ -506,6 +528,8 @@ class MainWindow(QMainWindow):
                 self.plate_text,
                 self._rectangles,
                 self._destination_folder,
+                environment_flag=self._environment_combo.currentData(),
+                brightness_flag=self._brightness_combo.currentData(),
             )
         except SaveError as exc:
             dialogs.show_error(self, "Cannot save", str(exc))

@@ -3,7 +3,7 @@
 Pure logic with no GUI dependencies. Builds crop filenames according to the
 convention::
 
-    {timestamp}_{source_stem}_{plate}_{position}_{character}.png
+    {timestamp}_{source_stem}_{plate}_{environment}_{brightness}_{position}_{character}.png
 
 Each crop includes the complete plate label and its 1-based character position.
 """
@@ -66,12 +66,17 @@ def build_filename(
     timestamp: str,
     position: int,
     plate_text: str | None = None,
+    environment_flag: str = "l",
+    brightness_flag: str = "n",
 ) -> str:
-    """Build a time-ordered filename containing the plate and character position."""
+    """Build a time-ordered filename with image conditions and character position."""
     label = sanitize_character_label(character)
     full_plate = plate_text if plate_text is not None else character
     plate_label = sanitize_plate_label(full_plate)
-    return f"{timestamp}_{stem}_{plate_label}_{position}_{label}.png"
+    return (
+        f"{timestamp}_{stem}_{plate_label}_{environment_flag}_"
+        f"{brightness_flag}_{position}_{label}.png"
+    )
 
 
 def destination_path(
@@ -81,9 +86,17 @@ def destination_path(
     timestamp: str,
     position: int,
     plate_text: str | None = None,
+    environment_flag: str = "l",
+    brightness_flag: str = "n",
 ) -> Path:
     """Full destination path for one character crop inside ``folder``."""
     name = build_filename(
-        source_stem(source_path), character, timestamp, position, plate_text
+        source_stem(source_path),
+        character,
+        timestamp,
+        position,
+        plate_text,
+        environment_flag,
+        brightness_flag,
     )
     return Path(folder) / name

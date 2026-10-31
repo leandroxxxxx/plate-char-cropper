@@ -12,6 +12,7 @@ PlateChar Annotator is a desktop application for extracting the seven characters
 - Adjust the row size and move all rectangles together with the **Size**, **Pan H**, and **Pan V** sliders.
 - Delete a selected rectangle with **Delete selected**, the **Delete** key, or **Backspace**. A deleted position is skipped when saving; the remaining positions keep their original numbers.
 - Enter plate characters and save one crop per non-empty character position.
+- Mark the capture environment as light or dark, and the plate as normal or brightly lit.
 - See an **Already processed** indicator when all planned output files for an image exist during the current app session.
 
 ## Requirements
@@ -56,7 +57,7 @@ python main.py
 4. Delete any character position that should not produce a crop. Rectangle numbers are fixed and are not reassigned when other rectangles are deleted.
 5. Enter the plate characters in the **Plate** field from left to right. The first character corresponds to rectangle 1, the second to rectangle 2, and so on. Use a space for a blank position. Missing trailing characters are also skipped.
 6. Click **Select destination folder…** and choose where to write the crops.
-7. Click **Save characters…**. If any planned output names already exist, choose **Overwrite All**, **Skip All**, or **Cancel**.
+7. Set **Environment** to Light or Dark and **Plate brightness** to Normal or Bright, then click **Save characters…**. If any planned output names already exist, choose **Overwrite All**, **Skip All**, or **Cancel**.
 8. Use **Previous image** or **Next image** to continue through images in the same folder. The plate text and destination folder remain selected while navigating; rectangles are cleared for each newly opened image.
 
 For example, with `ABCDEFG` entered, deleting rectangle 3 skips `C`. Deleting rectangles 3 and 5 skips `C` and `E`; positions 4, 6, and 7 still map to `D`, `F`, and `G` respectively.
@@ -75,10 +76,10 @@ For example, with `ABCDEFG` entered, deleting rectangle 3 skips `C`. Deleting re
 Each crop is saved as a PNG in the selected destination folder. Its filename follows this pattern:
 
 ```text
-{YYMMDDHHMMSS_microseconds}_{source_stem}_{full_plate}_{position}_{character}.png
+{YYMMDDHHMMSS_microseconds}_{source_stem}_{full_plate}_{l|d}_{n|b}_{position}_{character}.png
 ```
 
-The timestamp is placed first and is made unique within the save batch, so filenames sort in crop creation order. Every filename includes the complete text from the **Plate** field, the crop's 1-based position, and the character label. Spaces in the plate text represent blank positions and appear as underscores in filenames. Characters that are invalid in common filenames are also replaced with underscores.
+The timestamp is placed first and is made unique within the save batch, so filenames sort in crop creation order. Every filename includes the complete text from the **Plate** field, then the environment code (`l` for light or `d` for dark), the plate-brightness code (`n` for normal or `b` for bright), the crop's 1-based position, and the character label. The character is always the final value before `.png`. Both selectors default to Light and Normal. Spaces in the plate text represent blank positions and appear as underscores in filenames. Characters that are invalid in common filenames are also replaced with underscores.
 
 Existing files are never overwritten without a prompt. **Overwrite All** replaces the planned files that already exist; **Skip All** keeps them and continues with other planned crops; **Cancel** stops the save. The **Already processed** indicator is kept in temporary memory for the current app session and is cleared when the application closes.
 
