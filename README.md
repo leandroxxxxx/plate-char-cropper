@@ -76,7 +76,7 @@ For example, with `ABCDEFG` entered, deleting rectangle 3 skips `C`. Deleting re
 Each crop is saved as a PNG in the selected destination folder. Its filename follows this pattern:
 
 ```text
-{YYMMDDHHMMSS_microseconds}_{source_stem}_{full_plate}_{l|d}_{n|b}_{position}_{character}.png
+{YYMMDDHHMMSS_microseconds}_{source_stem}_{l|d}_{n|b}_{full_plate}_{position}_{character}.png
 ```
 
 The timestamp is placed first and is made unique within the save batch, so filenames sort in crop creation order. Every filename includes the complete text from the **Plate** field, then the environment code (`l` for light or `d` for dark), the plate-brightness code (`n` for normal or `b` for bright), the crop's 1-based position, and the character label. The character is always the final value before `.png`. Both selectors default to Light and Normal. Spaces in the plate text represent blank positions and appear as underscores in filenames. Characters that are invalid in common filenames are also replaced with underscores.

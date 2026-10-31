@@ -74,8 +74,8 @@ def build_filename(
     full_plate = plate_text if plate_text is not None else character
     plate_label = sanitize_plate_label(full_plate)
     return (
-        f"{timestamp}_{stem}_{plate_label}_{environment_flag}_"
-        f"{brightness_flag}_{position}_{label}.png"
+        f"{timestamp}_{stem}_{environment_flag}_"
+        f"{brightness_flag}_{plate_label}_{position}_{label}.png"
     )
 
 
