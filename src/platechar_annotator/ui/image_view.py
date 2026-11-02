@@ -16,7 +16,9 @@ from PySide6.QtGui import (
     QImage,
     QKeyEvent,
     QMouseEvent,
+    QPaintEvent,
     QPainter,
+    QPen,
     QPixmap,
     QResizeEvent,
     QTransform,
@@ -61,6 +63,71 @@ def pil_to_qpixmap(image: Image.Image) -> QPixmap:
     return QPixmap.fromImage(qimage.copy())
 
 
+class ImagePreview(QFrame):
+    """Small frame displaying the full image context and current visible region."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(160, 110)
+        self.setStyleSheet(
+            "QFrame { background-color: #202020; border: 1px solid #555; border-radius: 4px; }"
+        )
+        self._pixmap: QPixmap | None = None
+        self._image_size: tuple[int, int] = (1, 1)
+        self._view_rect: tuple[float, float, float, float] | None = None
+
+    def set_image(self, image: Image.Image | None) -> None:
+        """Update thumbnail pixmap from the loaded PIL image."""
+        if image is None:
+            self._pixmap = None
+            self._view_rect = None
+            self.update()
+            return
+
+        self._image_size = (image.width, image.height)
+        qpix = pil_to_qpixmap(image)
+        inner_w = max(1, self.width() - 4)
+        inner_h = max(1, self.height() - 4)
+        self._pixmap = qpix.scaled(
+            inner_w,
+            inner_h,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.update()
+
+    def set_view_rect(self, rect: tuple[float, float, float, float] | None) -> None:
+        """Update the region currently visible in the main image view."""
+        self._view_rect = rect
+        self.update()
+
+    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802 (Qt API)
+        super().paintEvent(event)
+        painter = QPainter(self)
+        if self._pixmap is None:
+            painter.setPen(QColor(120, 120, 120))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No image")
+            return
+
+        pm_w = self._pixmap.width()
+        pm_h = self._pixmap.height()
+        x = (self.width() - pm_w) // 2
+        y = (self.height() - pm_h) // 2
+        painter.drawPixmap(x, y, self._pixmap)
+
+        if self._view_rect and self._image_size[0] > 0 and self._image_size[1] > 0:
+            vx, vy, vw, vh = self._view_rect
+            img_w, img_h = self._image_size
+            if vw < img_w * 0.99 or vh < img_h * 0.99:
+                rx = x + (vx / img_w) * pm_w
+                ry = y + (vy / img_h) * pm_h
+                rw = max(2.0, (vw / img_w) * pm_w)
+                rh = max(2.0, (vh / img_h) * pm_h)
+                painter.setPen(QPen(QColor(0, 180, 255), 1.5))
+                painter.setBrush(QBrush(QColor(0, 180, 255, 40)))
+                painter.drawRect(QRectF(rx, ry, rw, rh))
+
+
 class ImageView(QGraphicsView):
     """Displays an image that can be zoomed, keeping its aspect ratio."""
 
@@ -69,6 +136,7 @@ class ImageView(QGraphicsView):
     rectangle_changed = Signal(int, float, float, float, float)
     rectangle_deleted = Signal(int)
     selection_changed = Signal(int)
+    view_changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -119,6 +187,7 @@ class ImageView(QGraphicsView):
             self._update_bicubic_pixmap()
         else:
             self.fit_to_view()
+        self.view_changed.emit()
 
     def _update_bicubic_pixmap(self) -> None:
         """Resample the display image at the current view scale with bicubic filtering.
@@ -233,6 +302,7 @@ class ImageView(QGraphicsView):
         if self._pixmap_item is not None:
             self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
             self._update_bicubic_pixmap()
+            self.view_changed.emit()
 
     def zoom_in(self) -> None:
         """Zoom in one step around the viewport center."""
@@ -251,6 +321,7 @@ class ImageView(QGraphicsView):
         target = max(_ZOOM_MIN, min(current * factor, _ZOOM_MAX))
         self.scale(target / current, target / current)
         self._update_bicubic_pixmap()
+        self.view_changed.emit()
 
     def visible_image_rect(self) -> tuple[float, float, float, float] | None:
         """The part of the image currently visible, in original-image pixels.
@@ -308,6 +379,7 @@ class ImageView(QGraphicsView):
             self.verticalScrollBar().setValue(
                 self.verticalScrollBar().value() - delta.y()
             )
+            self.view_changed.emit()
             event.accept()
             return
         super().mouseMoveEvent(event)
@@ -328,3 +400,4 @@ class ImageView(QGraphicsView):
         # Once the user has zoomed, keep the zoom level across resizes.
         if not self._manual_zoom:
             self.fit_to_view()
+        self.view_changed.emit()

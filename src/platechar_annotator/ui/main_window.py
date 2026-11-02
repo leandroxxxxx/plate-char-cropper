@@ -42,7 +42,7 @@ from platechar_annotator.services.save_service import (
     save_crops,
 )
 from platechar_annotator.ui import dialogs
-from platechar_annotator.ui.image_view import ImageView
+from platechar_annotator.ui.image_view import ImagePreview, ImageView
 
 
 class MainWindow(QMainWindow):
@@ -68,6 +68,10 @@ class MainWindow(QMainWindow):
         self._image_view.rectangle_changed.connect(self._on_rectangle_changed)
         self._image_view.rectangle_deleted.connect(self._on_rectangle_deleted)
         self._image_view.selection_changed.connect(self._on_rectangle_selection_changed)
+        self._image_view.view_changed.connect(self._update_preview_view_rect)
+
+        self._preview = ImagePreview()
+        self._preview.setToolTip("Full image overview with current visible region")
 
         self._open_button = QPushButton("Open image…")
         self._open_button.clicked.connect(self._on_open_image)
@@ -204,13 +208,20 @@ class MainWindow(QMainWindow):
         status_row = QHBoxLayout()
         status_row.addWidget(self._status_label, stretch=1)
 
+        middle_controls = QVBoxLayout()
+        middle_controls.addLayout(plate_row)
+        middle_controls.addLayout(conditions_row)
+        middle_controls.addLayout(folder_row)
+        middle_controls.addLayout(status_row)
+
+        middle_section = QHBoxLayout()
+        middle_section.addLayout(middle_controls, stretch=1)
+        middle_section.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignTop)
+
         layout = QVBoxLayout()
         layout.addLayout(toolbar)
         layout.addLayout(adjustment_row)
-        layout.addLayout(plate_row)
-        layout.addLayout(conditions_row)
-        layout.addLayout(folder_row)
-        layout.addLayout(status_row)
+        layout.addLayout(middle_section)
         layout.addWidget(self._image_view, stretch=1)
 
         central = QWidget()
@@ -303,6 +314,11 @@ class MainWindow(QMainWindow):
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
         self._update_processed_indicator()
         self._status_label.setText("")
+        self._preview.set_image(loaded.pixels)
+        self._update_preview_view_rect()
+
+    def _update_preview_view_rect(self) -> None:
+        self._preview.set_view_rect(self._image_view.visible_image_rect())
 
     def _update_processed_indicator(self) -> None:
         """Show a blue marker when the current image was processed this session."""
