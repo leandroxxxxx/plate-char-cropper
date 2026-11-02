@@ -3,8 +3,13 @@
 import re
 from pathlib import Path
 
-from PySide6.QtCore import QRegularExpression, Qt
-from PySide6.QtGui import QFontDatabase, QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression, QSize, Qt
+from PySide6.QtGui import (
+    QFontDatabase,
+    QPaintEvent,
+    QPainter,
+    QRegularExpressionValidator,
+)
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -12,6 +17,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QSizePolicy,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -43,6 +49,44 @@ from platechar_annotator.services.save_service import (
 )
 from platechar_annotator.ui import dialogs
 from platechar_annotator.ui.image_view import ImagePreview, ImageView
+
+
+class ElidedLabel(QLabel):
+    """A label that elides text in the middle when there is insufficient space,
+    preventing long paths from forcing the window to expand horizontally.
+    """
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(text, parent)
+        self._full_text = text
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        if text:
+            self.setToolTip(text)
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self._full_text = text
+        self.setToolTip(text)
+        super().setText(text)
+        self.update()
+
+    def text(self) -> str:
+        return self._full_text
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return QSize(0, super().minimumSizeHint().height())
+
+    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setFont(self.font())
+        metrics = painter.fontMetrics()
+        elided = metrics.elidedText(
+            self._full_text, Qt.TextElideMode.ElideMiddle, max(0, self.width())
+        )
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(
+            self.rect(), self.alignment() | Qt.AlignmentFlag.AlignVCenter, elided
+        )
 
 
 class MainWindow(QMainWindow):
@@ -121,10 +165,10 @@ class MainWindow(QMainWindow):
         self._save_button = QPushButton("Save characters…")
         self._save_button.clicked.connect(self._on_save)
 
-        self._path_label = QLabel("No image loaded.")
+        self._path_label = ElidedLabel("No image loaded.")
         self._processed_label = QLabel("")
-        self._processed_label.setStyleSheet("color: blue; font-weight: bold;")
-        self._status_label = QLabel("")
+        self._processed_label.setStyleSheet("color: #4da6ff; font-weight: bold;")
+        self._status_label = ElidedLabel("")
 
         self._plate_input = QLineEdit()
         self._plate_input.setPlaceholderText(
@@ -159,7 +203,7 @@ class MainWindow(QMainWindow):
         self._folder_button = QPushButton("Select destination folder…")
         self._folder_button.clicked.connect(self._on_select_folder)
 
-        self._folder_label = QLabel("No destination folder selected.")
+        self._folder_label = ElidedLabel("No destination folder selected.")
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(self._open_button)
