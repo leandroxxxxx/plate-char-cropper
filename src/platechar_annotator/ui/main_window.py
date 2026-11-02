@@ -285,16 +285,21 @@ class MainWindow(QMainWindow):
             self._image_paths.sort(key=self._image_sort_key)
         self._image_index = self._image_paths.index(path)
         self._update_image_navigation()
-        # Rectangles are hidden and reset every time a new image is opened.
-        self._rectangles = []
-        self._rectangles_visible = False
-        self._size_anchor_rectangles = []
-        self._size_anchor_value = self._size_slider.value()
         self._reset_pan_sliders()
-        self._place_button.setText("Place rectangles")
+        self._delete_rectangle_button.setEnabled(False)
         self._image_view.set_image(
             loaded.pixels, preserve_zoom=preserve_zoom
-        )  # Drops any rectangle overlays.
+        )
+        if self._rectangles_visible and self._rectangles:
+            self._image_view.set_rectangles(self._rectangles)
+            self._capture_size_anchor()
+            self._place_button.setText("Re-place rectangles")
+        else:
+            self._rectangles = []
+            self._rectangles_visible = False
+            self._size_anchor_rectangles = []
+            self._size_anchor_value = self._size_slider.value()
+            self._place_button.setText("Place rectangles")
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
         self._update_processed_indicator()
         self._status_label.setText("")
