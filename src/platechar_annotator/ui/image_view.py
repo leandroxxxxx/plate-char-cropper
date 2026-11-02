@@ -9,7 +9,7 @@ stored in original-image pixels regardless of the on-screen zoom.
 from collections.abc import Sequence
 
 from PIL import Image
-from PySide6.QtCore import QPoint, QRectF, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -90,14 +90,35 @@ class ImageView(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-    def set_image(self, image: Image.Image) -> None:
+    def set_image(self, image: Image.Image, preserve_zoom: bool = False) -> None:
         """Replace the displayed image, dropping any rectangle overlays."""
+        should_preserve = (
+            preserve_zoom
+            and self._manual_zoom
+            and self._display_image is not None
+            and self._pixmap_item is not None
+        )
+        center_scene = (
+            self.mapToScene(self.viewport().rect().center())
+            if should_preserve
+            else None
+        )
+
         self._rect_items = []
         self._scene.clear()
         self._display_image = image.convert("RGBA")
         self._pixmap_item = self._scene.addPixmap(pil_to_qpixmap(self._display_image))
         self._scene.setSceneRect(self._pixmap_item.sceneBoundingRect())
-        self.fit_to_view()
+        if should_preserve and center_scene is not None:
+            new_w, new_h = self._display_image.size
+            clamped_center = QPointF(
+                max(0.0, min(center_scene.x(), float(new_w))),
+                max(0.0, min(center_scene.y(), float(new_h))),
+            )
+            self.centerOn(clamped_center)
+            self._update_bicubic_pixmap()
+        else:
+            self.fit_to_view()
 
     def _update_bicubic_pixmap(self) -> None:
         """Resample the display image at the current view scale with bicubic filtering.

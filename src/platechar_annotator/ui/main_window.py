@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
 
         self._load_and_show_image(path)
 
-    def _load_and_show_image(self, path: Path) -> None:
+    def _load_and_show_image(self, path: Path, preserve_zoom: bool = False) -> None:
         """Load an image and refresh the current-folder navigation state."""
 
         try:
@@ -292,7 +292,9 @@ class MainWindow(QMainWindow):
         self._size_anchor_value = self._size_slider.value()
         self._reset_pan_sliders()
         self._place_button.setText("Place rectangles")
-        self._image_view.set_image(loaded.pixels)  # Drops any rectangle overlays.
+        self._image_view.set_image(
+            loaded.pixels, preserve_zoom=preserve_zoom
+        )  # Drops any rectangle overlays.
         self._path_label.setText(f"{path}  ({loaded.width} × {loaded.height} px)")
         self._update_processed_indicator()
         self._status_label.setText("")
@@ -329,7 +331,9 @@ class MainWindow(QMainWindow):
             return
         target_index = self._image_index + offset
         if 0 <= target_index < len(self._image_paths):
-            self._load_and_show_image(self._image_paths[target_index])
+            self._load_and_show_image(
+                self._image_paths[target_index], preserve_zoom=True
+            )
 
     def _update_image_navigation(self) -> None:
         index = self._image_index

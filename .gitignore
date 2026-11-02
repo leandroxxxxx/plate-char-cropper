@@ -1,5 +1,9 @@
 __pycache__/
 .local_config.json
+.vscode
+.venv
+.pytest_cache
 executar.sh
 todo.md
-afazer.md
+repomix-output.xml
+.repomix
